@@ -86,9 +86,6 @@ namespace textgen
                     systemPrompt = await File.ReadAllTextAsync(systemPromptFile, cancellationToken);
                 }
 
-                Console.WriteLine("model:" + model);
-                Console.WriteLine("prompt:" + prompt);
-
                 // Validate inputs
                 if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
                 {
