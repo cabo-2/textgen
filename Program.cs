@@ -34,7 +34,10 @@ namespace textgen
             var promptOption = app.Option("-p|--prompt <PROMPT>", "Input message directly.", CommandOptionType.SingleValue);
             var promptFileOption = app.Option("-P|--prompt-file <FNAME>", "Input message from a file.", CommandOptionType.SingleValue);
             var systemOption = app.Option("-s|--system <SYSTEM_PROMPT>", "System prompt directly.", CommandOptionType.SingleValue);
+            systemOption.DefaultValue = "";
             var systemFileOption = app.Option("-S|--system-file <FNAME>", "System prompt from a file.", CommandOptionType.SingleValue);
+            var formatOption = app.Option("-f|--format <FORMAT>", "Output format (text, detail, json)", CommandOptionType.SingleValue);
+            formatOption.DefaultValue = "text";
             var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
 
             app.HelpOption("-h|--help");
@@ -59,6 +62,7 @@ namespace textgen
                 string promptFile = promptFileOption.Value();
                 string systemPrompt = systemOption.Value();
                 string systemPromptFile = systemFileOption.Value();
+                string format = formatOption.Value();
                 string outputFile = outputOption.Value();
 
                 // Load prompt from file if specified
@@ -87,17 +91,51 @@ namespace textgen
                 // Output result
                 if (!string.IsNullOrEmpty(outputFile))
                 {
-                    await File.WriteAllTextAsync(outputFile, responseText, cancellationToken);
+                    string formattedOutput = FormatOutput(format, model, prompt, systemPrompt, responseText);
+                    await File.WriteAllTextAsync(outputFile, formattedOutput, cancellationToken);
                 }
                 else
                 {
-                    Console.WriteLine(responseText);
+                    string formattedOutput = FormatOutput(format, model, prompt, systemPrompt, responseText);
+                    Console.WriteLine(formattedOutput);
                 }
 
                 return 0;
             });
 
             return await app.ExecuteAsync(args);
+        }
+
+        private static string FormatOutput(string format, string model, string prompt, string systemPrompt, string completion)
+        {
+            var date = DateTime.Now.ToString("o"); // ISO 8601形式の日時
+            var host = openAIHost; // リクエストしたURI
+
+            switch (format?.ToLower())
+            {
+                case "detailed":
+                    return $"@date\n{date}\n" +
+                           $"@host\n{host}\n" +
+                           $"@model\n{model}\n" +
+                           $"@system-prompt\n{systemPrompt}\n" +
+                           $"@prompt\n{prompt}\n" +
+                           $"@completion\n{completion}";
+
+                case "json":
+                    var jsonOutput = new
+                    {
+                        date = date,
+                        host = host,
+                        model = model,
+                        system_prompt = systemPrompt,
+                        prompt = prompt,
+                        completion = completion
+                    };
+                    return JsonConvert.SerializeObject(jsonOutput, Formatting.Indented); // 読みやすいフォーマットで出力
+
+                default: // text
+                    return completion;
+            }
         }
     }
 
