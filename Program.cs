@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
+using McMaster.Extensions.CommandLineUtils.Validation;
 using Newtonsoft.Json;
 
 namespace textgen
@@ -38,8 +39,10 @@ namespace textgen
             var systemFileOption = app.Option("-S|--system-file <FNAME>", "System prompt from a file.", CommandOptionType.SingleValue);
             var formatOption = app.Option("-f|--format <FORMAT>", "Output format (text, detail, json)", CommandOptionType.SingleValue);
             formatOption.DefaultValue = "text";
+            formatOption.Accepts().Values("text", "detail", "json");
             var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
             var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (JSON).", CommandOptionType.SingleValue);
+            configOption.Accepts().ExistingFile();
 
             app.HelpOption("-h|--help");
             app.VersionOption("-v|--version", "1.0.0");
@@ -131,11 +134,11 @@ namespace textgen
 
             switch (format?.ToLower())
             {
-                case "detailed":
+                case "detail":
                     return $"@date\n{date}\n\n" +
                            $"@host\n{host}\n\n" +
                            $"@model\n{model}\n\n" +
-                           $"@config\n\n" +
+                           $"@config\n" +
                            $"max_tokens={maxTokens}\n" +
                            $"seed={seed}\n" +
                            $"temperature={temperature}\n" +
