@@ -39,6 +39,7 @@ namespace textgen
             var formatOption = app.Option("-f|--format <FORMAT>", "Output format (text, detail, json)", CommandOptionType.SingleValue);
             formatOption.DefaultValue = "text";
             var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
+            var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (JSON).", CommandOptionType.SingleValue);
 
             app.HelpOption("-h|--help");
             app.VersionOption("-v|--version", "1.0.0");
@@ -64,6 +65,23 @@ namespace textgen
                 string systemPromptFile = systemFileOption.Value();
                 string format = formatOption.Value();
                 string outputFile = outputOption.Value();
+                string configFile = configOption.Value();
+
+                // Load parameters from config file if specified
+                int maxTokens = 1200;
+                int seed = 0;
+                double temperature = 0.7;
+                double topP = 1;
+
+                if (!string.IsNullOrEmpty(configFile))
+                {
+                    var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
+                    dynamic config = JsonConvert.DeserializeObject(configContent);
+                    maxTokens = config.max_tokens ?? maxTokens;
+                    seed = config.seed ?? seed;
+                    temperature = config.temperature ?? temperature;
+                    topP = config.top_p ?? topP;
+                }
 
                 // Load prompt from file if specified
                 if (!string.IsNullOrEmpty(promptFile))
@@ -86,7 +104,7 @@ namespace textgen
 
                 // Use TextGenerator to call OpenAI API
                 var textGenerator = new TextGenerator(httpClient, openAIHost);
-                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, cancellationToken);
+                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, maxTokens, seed, temperature, topP, cancellationToken);
 
                 // Output result
                 if (!string.IsNullOrEmpty(outputFile))
@@ -108,8 +126,8 @@ namespace textgen
 
         private static string FormatOutput(string format, string model, string prompt, string systemPrompt, string completion)
         {
-            var date = DateTime.Now.ToString("o"); // ISO 8601形式の日時
-            var host = openAIHost; // リクエストしたURI
+            var date = DateTime.Now.ToString("o"); // ISO 8601 format date
+            var host = openAIHost; // Request URI
 
             switch (format?.ToLower())
             {
@@ -131,7 +149,7 @@ namespace textgen
                         prompt = prompt,
                         completion = completion
                     };
-                    return JsonConvert.SerializeObject(jsonOutput, Formatting.Indented); // 読みやすいフォーマットで出力
+                    return JsonConvert.SerializeObject(jsonOutput, Formatting.Indented); // Pretty format output
 
                 default: // text
                     return completion;
@@ -150,7 +168,7 @@ namespace textgen
             _apiHost = apiHost;
         }
 
-        public async Task<string> GenerateTextAsync(string model, string prompt, string systemPrompt, CancellationToken cancellationToken = default)
+        public async Task<string> GenerateTextAsync(string model, string prompt, string systemPrompt, int maxTokens, int seed, double temperature, double topP, CancellationToken cancellationToken = default)
         {
             var requestBody = new
             {
@@ -159,7 +177,11 @@ namespace textgen
                 {
                     new { role = "system", content = systemPrompt ?? "" },
                     new { role = "user", content = prompt }
-                }
+                },
+                max_tokens = maxTokens,
+                seed = seed,
+                temperature = temperature,
+                top_p = topP
             };
 
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
