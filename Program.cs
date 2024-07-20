@@ -11,7 +11,14 @@ namespace textgen
 {
     class Program
     {
-        private static readonly HttpClient httpClient = new HttpClient();
+        private static string openAIHost;
+        private static readonly HttpClient httpClient;
+        static Program()
+        {
+            openAIHost = Environment.GetEnvironmentVariable("OPENAI_API_HOST") ?? "http://localhost:8080/v1/chat/completions";
+            httpClient = new HttpClient();
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
+        }
 
         static async Task<int> Main(string[] args)
         {
@@ -21,17 +28,18 @@ namespace textgen
                 Description = "A simple console app to generate text using OpenAI's API."
             };
 
-            string model = null;
-            string prompt = null;
-            string promptFile = null;
-            string systemPrompt = null;
-            string systemPromptFile = null;
-            string outputFile = null;
+            // Command-line arguments
+            var modelOption = app.Option("-m|--model <MODEL>", "Specify the model to use (gpt-3.5-turbo, gpt-4).", CommandOptionType.SingleValue);
+            var promptOption = app.Option("-p|--prompt <PROMPT>", "Input message directly.", CommandOptionType.SingleValue);
+            var promptFileOption = app.Option("-P|--prompt-file <FNAME>", "Input message from a file.", CommandOptionType.SingleValue);
+            var systemOption = app.Option("-s|--system <SYSTEM_PROMPT>", "System prompt directly.", CommandOptionType.SingleValue);
+            var systemFileOption = app.Option("-S|--system-file <FNAME>", "System prompt from a file.", CommandOptionType.SingleValue);
+            var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
 
             app.HelpOption("-h|--help");
             app.VersionOption("-v|--version", "1.0.0");
 
-            app.Command("list-model", cmd =>
+            app.Command("-l|--list-model", cmd =>
             {
                 cmd.Description = "List available models.";
                 cmd.OnExecute(() =>
@@ -45,15 +53,12 @@ namespace textgen
 
             app.OnExecuteAsync(async (cancellationToken) =>
             {
-                // Command-line arguments
-                var modelOption = app.Option("-m|--model <MODEL>", "Specify the model to use (gpt-3.5-turbo, gpt-4).", CommandOptionType.SingleValue);
-                var promptOption = app.Option("-p|--prompt <PROMPT>", "Input message directly.", CommandOptionType.SingleValue);
-                var promptFileOption = app.Option("-P|--prompt-file <FNAME>", "Input message from a file.", CommandOptionType.SingleValue);
-                var systemOption = app.Option("-s|--system <SYSTEM_PROMPT>", "System prompt directly.", CommandOptionType.SingleValue);
-                var systemFileOption = app.Option("-S|--system-file <FNAME>", "System prompt from a file.", CommandOptionType.SingleValue);
-                var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
-
-                app.ShowHint();
+                string model = null;
+                string prompt = null;
+                string promptFile = null;
+                string systemPrompt = null;
+                string systemPromptFile = null;
+                string outputFile = null;
 
                 // Parse options
                 if (modelOption.HasValue())
@@ -81,6 +86,9 @@ namespace textgen
                     systemPrompt = await File.ReadAllTextAsync(systemPromptFile, cancellationToken);
                 }
 
+                Console.WriteLine("model:" + model);
+                Console.WriteLine("prompt:" + prompt);
+
                 // Validate inputs
                 if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
                 {
@@ -101,16 +109,14 @@ namespace textgen
                     Console.WriteLine(responseText);
                 }
 
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
-
                 return 0;
             });
 
             return await app.ExecuteAsync(args);
         }
 
-        private static async Task<string> CallOpenAIAsync(string model, string prompt, string systemPrompt)
-        {
+        private static async Task<string> CallOpenAIAsync(string model, string prompt, string systemPrompt, CancellationToken cancellationToken = default)
+        {            
             var requestBody = new
             {
                 model = model,
@@ -124,10 +130,10 @@ namespace textgen
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
             var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
-            var response = await httpClient.PostAsync(Environment.GetEnvironmentVariable("OPENAI_API_HOST"), content);
+            var response = await httpClient.PostAsync(openAIHost, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var jsonResponse = await response.Content.ReadAsStringAsync();
+            var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
             dynamic result = JsonConvert.DeserializeObject(jsonResponse);
 
             return result.choices[0].message.content.ToString();
