@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
@@ -11,12 +12,12 @@ namespace textgen
 {
     class Program
     {
+        private static readonly HttpClient httpClient = new HttpClient();
         private static string openAIHost;
-        private static readonly HttpClient httpClient;
+
         static Program()
         {
             openAIHost = Environment.GetEnvironmentVariable("OPENAI_API_HOST") ?? "http://localhost:8080/v1/chat/completions";
-            httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
         }
 
@@ -53,26 +54,12 @@ namespace textgen
 
             app.OnExecuteAsync(async (cancellationToken) =>
             {
-                string model = null;
-                string prompt = null;
-                string promptFile = null;
-                string systemPrompt = null;
-                string systemPromptFile = null;
-                string outputFile = null;
-
-                // Parse options
-                if (modelOption.HasValue())
-                    model = modelOption.Value();
-                if (promptOption.HasValue())
-                    prompt = promptOption.Value();
-                if (promptFileOption.HasValue())
-                    promptFile = promptFileOption.Value();
-                if (systemOption.HasValue())
-                    systemPrompt = systemOption.Value();
-                if (systemFileOption.HasValue())
-                    systemPromptFile = systemFileOption.Value();
-                if (outputOption.HasValue())
-                    outputFile = outputOption.Value();
+                string model = modelOption.Value();
+                string prompt = promptOption.Value();
+                string promptFile = promptFileOption.Value();
+                string systemPrompt = systemOption.Value();
+                string systemPromptFile = systemFileOption.Value();
+                string outputFile = outputOption.Value();
 
                 // Load prompt from file if specified
                 if (!string.IsNullOrEmpty(promptFile))
@@ -93,8 +80,9 @@ namespace textgen
                     return 1;
                 }
 
-                // Call OpenAI API
-                var responseText = await CallOpenAIAsync(model, prompt, systemPrompt);
+                // Use TextGenerator to call OpenAI API
+                var textGenerator = new TextGenerator(httpClient, openAIHost);
+                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, cancellationToken);
 
                 // Output result
                 if (!string.IsNullOrEmpty(outputFile))
@@ -111,9 +99,21 @@ namespace textgen
 
             return await app.ExecuteAsync(args);
         }
+    }
 
-        private static async Task<string> CallOpenAIAsync(string model, string prompt, string systemPrompt, CancellationToken cancellationToken = default)
-        {            
+    class TextGenerator
+    {
+        private readonly HttpClient _httpClient;
+        private readonly string _apiHost;
+
+        public TextGenerator(HttpClient httpClient, string apiHost)
+        {
+            _httpClient = httpClient;
+            _apiHost = apiHost;
+        }
+
+        public async Task<string> GenerateTextAsync(string model, string prompt, string systemPrompt, CancellationToken cancellationToken = default)
+        {
             var requestBody = new
             {
                 model = model,
@@ -127,7 +127,7 @@ namespace textgen
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
             var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
-            var response = await httpClient.PostAsync(openAIHost, content, cancellationToken);
+            var response = await _httpClient.PostAsync(_apiHost, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
