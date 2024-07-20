@@ -109,12 +109,12 @@ namespace textgen
                 // Output result
                 if (!string.IsNullOrEmpty(outputFile))
                 {
-                    string formattedOutput = FormatOutput(format, model, prompt, systemPrompt, responseText);
+                    string formattedOutput = FormatOutput(format, model, prompt, systemPrompt, responseText, maxTokens, seed, temperature, topP);
                     await File.WriteAllTextAsync(outputFile, formattedOutput, cancellationToken);
                 }
                 else
                 {
-                    string formattedOutput = FormatOutput(format, model, prompt, systemPrompt, responseText);
+                    string formattedOutput = FormatOutput(format, model, prompt, systemPrompt, responseText, maxTokens, seed, temperature, topP);
                     Console.WriteLine(formattedOutput);
                 }
 
@@ -124,7 +124,7 @@ namespace textgen
             return await app.ExecuteAsync(args);
         }
 
-        private static string FormatOutput(string format, string model, string prompt, string systemPrompt, string completion)
+        private static string FormatOutput(string format, string model, string prompt, string systemPrompt, string completion, int maxTokens, int seed, double temperature, double topP)
         {
             var date = DateTime.Now.ToString("o"); // ISO 8601 format date
             var host = openAIHost; // Request URI
@@ -132,11 +132,16 @@ namespace textgen
             switch (format?.ToLower())
             {
                 case "detailed":
-                    return $"@date\n{date}\n" +
-                           $"@host\n{host}\n" +
-                           $"@model\n{model}\n" +
-                           $"@system-prompt\n{systemPrompt}\n" +
-                           $"@prompt\n{prompt}\n" +
+                    return $"@date\n{date}\n\n" +
+                           $"@host\n{host}\n\n" +
+                           $"@model\n{model}\n\n" +
+                           $"@config\n\n" +
+                           $"max_tokens={maxTokens}\n" +
+                           $"seed={seed}\n" +
+                           $"temperature={temperature}\n" +
+                           $"top_p={topP}\n\n" +
+                           $"@system-prompt\n{systemPrompt}\n\n" +
+                           $"@prompt\n{prompt}\n\n" +
                            $"@completion\n{completion}";
 
                 case "json":
@@ -145,6 +150,13 @@ namespace textgen
                         date = date,
                         host = host,
                         model = model,
+                        config = new
+                        {
+                            max_tokens = maxTokens,
+                            seed = seed,
+                            temperature = temperature,
+                            top_p = topP
+                        },
                         system_prompt = systemPrompt,
                         prompt = prompt,
                         completion = completion
