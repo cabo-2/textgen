@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the options for getopt
-options="i:o:h"
+options="i:o:hmv:ls:S:f:c:"
 
 # Parse the command-line arguments
 while getopts "$options" opt; do
@@ -12,8 +12,31 @@ while getopts "$options" opt; do
     o)
       output_dir="$OPTARG"
       ;;
+    m)
+      model="$OPTARG"
+      ;;
+    v)
+      textgen --version
+      exit 0
+      ;;
+    l)
+      textgen --list-model
+      exit 0
+      ;;
+    s)
+      system_prompt="$OPTARG"
+      ;;
+    S)
+      system_file="$OPTARG"
+      ;;
+    f)
+      format="$OPTARG"
+      ;;
+    c)
+      config="$OPTARG"
+      ;;
     h)
-      myprog --help
+      textgen --help
       exit 0
       ;;
     \?)
@@ -60,6 +83,12 @@ find "$input_dir_full" -maxdepth 1 -type f -print0 | while IFS= read -r -d $'\0'
   # Create the full path of the output file
   output_file="$output_dir_full/$filename"
 
-  # Execute myprog command with the full paths of input and output files
-  myprog "$file_full" "$output_file" "${args[@]}"
+  # Execute textgen command with the full paths of input and output files
+  textgen -P "$file_full" -o "$output_file" \
+    ${model:+-m "$model"} \
+    ${system_prompt:+-s "$system_prompt"} \
+    ${system_file:+-S "$system_file"} \
+    ${format:+-f "$format"} \
+    ${config:+-c "$config"} \
+    "${args[@]}"
 done
