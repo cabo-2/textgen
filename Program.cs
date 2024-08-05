@@ -69,7 +69,7 @@ namespace textgen
                 string configFile = configOption.Value();
 
                 // Load parameters from config file if specified
-                var config = LoadConfig(configFile, cancellationToken);
+                var config = await Config.LoadConfigAsync(configFile, cancellationToken);
 
                 // Load prompt from file if specified
                 if (!string.IsNullOrEmpty(promptFile))
@@ -122,31 +122,6 @@ namespace textgen
 
             return await app.ExecuteAsync(args);
         }
-
-        private static Config LoadConfig(string configFile, CancellationToken cancellationToken)
-        {
-            if (string.IsNullOrEmpty(configFile))
-            {
-                return new Config
-                {
-                    MaxTokens = 1200,
-                    Seed = 0,
-                    Temperature = 0.7,
-                    TopP = 1
-                };
-            }
-
-            var configContent = File.ReadAllText(configFile);
-            dynamic config = JsonConvert.DeserializeObject(configContent);
-
-            return new Config
-            {
-                MaxTokens = config.max_tokens ?? 1200,
-                Seed = config.seed ?? 0,
-                Temperature = config.temperature ?? 0.7,
-                TopP = config.top_p ?? 1
-            };
-        }
     }
 
     public class OutputResult
@@ -187,12 +162,43 @@ namespace textgen
 
     public class Config
     {
+        public static readonly Config DefaultConfig = new Config
+        {
+            MaxTokens = 1200,
+            Seed = 0,
+            Temperature = 0.7,
+            TopP = 1,
+            Username = "user",
+            AssistantName = "assistant"
+        };
+
         public int MaxTokens { get; set; }
         public int Seed { get; set; }
         public double Temperature { get; set; }
         public double TopP { get; set; }
-        public string Username { get; set; } = "user";
-        public string AssistantName { get; set; } = "assistant";
+        public string Username { get; set; }
+        public string AssistantName { get; set; }
+
+        public static async Task<Config> LoadConfigAsync(string configFile, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrEmpty(configFile))
+            {
+                return DefaultConfig; // Use default values
+            }
+
+            var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
+            dynamic config = JsonConvert.DeserializeObject(configContent);
+
+            return new Config
+            {
+                MaxTokens = config.max_tokens ?? DefaultConfig.MaxTokens,
+                Seed = config.seed ?? DefaultConfig.Seed,
+                Temperature = config.temperature ?? DefaultConfig.Temperature,
+                TopP = config.top_p ?? DefaultConfig.TopP,
+                Username = config.username ?? DefaultConfig.Username,
+                AssistantName = config.assistant_name ?? DefaultConfig.AssistantName
+            };
+        }
     }
 
     class TextGenerator
@@ -215,7 +221,6 @@ namespace textgen
                 {
                     new { role = "system", content = systemPrompt ?? "" },
                     new { role = config.Username, content = prompt }
-                    //new { role = config.AssistantName, content = "" }
                 },
                 max_tokens = config.MaxTokens,
                 seed = config.Seed,
