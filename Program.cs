@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -131,6 +132,7 @@ namespace textgen
         public string SystemPrompt { get; set; }
         public string Prompt { get; set; }
         public string Completion { get; set; }
+        public List<KeyValuePair<string, string>> History { get; set; } = new List<KeyValuePair<string, string>>();
 
         public string Format(string format)
         {
@@ -140,19 +142,33 @@ namespace textgen
                     return JsonConvert.SerializeObject(this, Formatting.Indented); // Pretty format output
 
                 default: // text
-                    return $"@date\n{Date}\n\n" +
-                           $"@host\n{Host}\n\n" +
-                           $"@model\n{Model}\n\n" +
-                           $"@config\n" +
-                           $"max_tokens={Config.MaxTokens}\n" +
-                           $"seed={Config.Seed}\n" +
-                           $"temperature={Config.Temperature}\n" +
-                           $"top_p={Config.TopP}\n" +
-                           $"username={Config.Username}\n" +
-                           $"assistant_name={Config.AssistantName}\n\n" +
-                           $"@system-prompt\n{SystemPrompt}\n\n" +
-                           $"@prompt\n{Prompt}\n\n" +
-                           $"@completion\n{Completion}";
+                    var sb = new StringBuilder();
+                    sb.Append($"@date\n{Date}\n\n");
+                    sb.Append($"@host\n{Host}\n\n");
+                    sb.Append($"@model\n{Model}\n\n");
+                    sb.Append($"@config\n");
+                    sb.Append($"max_tokens={Config.MaxTokens}\n");
+                    sb.Append($"seed={Config.Seed}\n");
+                    sb.Append($"temperature={Config.Temperature}\n");
+                    sb.Append($"top_p={Config.TopP}\n");
+                    sb.Append($"username={Config.Username}\n");
+                    sb.Append($"assistant_name={Config.AssistantName}\n\n");
+                    sb.Append($"@system-prompt\n{SystemPrompt}\n\n");
+
+                    if (History.Count > 0)
+                    {
+                        for (int i = 0; i < History.Count; i++)
+                        {
+                            var history = History[i];
+                            sb.Append($"@history-prompt_{i + 1}\n{history.Key}\n\n");
+                            sb.Append($"@history-completion_{i + 1}\n{history.Value}\n\n");
+                        }
+                    }
+
+                    sb.Append($"@prompt\n{Prompt}\n\n");
+                    sb.Append($"@completion\n{Completion}");
+
+                    return sb.ToString();
             }
         }
 
@@ -227,6 +243,16 @@ namespace textgen
                 else if (line.StartsWith("@completion"))
                 {
                     result.Completion = lines[++i];
+                }
+                else if (line.StartsWith("@history-prompt"))
+                {
+                    var prompt = lines[++i];
+                    var completionLine = lines[++i];
+                    if (completionLine.StartsWith("@history-completion"))
+                    {
+                        var completion = lines[++i];
+                        result.History.Add(new KeyValuePair<string, string>(prompt, completion));
+                    }
                 }
             }
 
