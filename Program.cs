@@ -35,9 +35,9 @@ namespace textgen
             var promptFileOption = app.Option("-P|--prompt-file <FNAME>", "Input message from a file.", CommandOptionType.SingleValue);
             var systemOption = app.Option("-s|--system <SYSTEM_PROMPT>", "System prompt directly.", CommandOptionType.SingleValue);
             var systemFileOption = app.Option("-S|--system-file <FNAME>", "System prompt from a file.", CommandOptionType.SingleValue);
-            var formatOption = app.Option("-f|--format <FORMAT>", "Output format (text, detail, json)", CommandOptionType.SingleValue);
+            var formatOption = app.Option("-f|--format <FORMAT>", "Output format (text, json)", CommandOptionType.SingleValue);
             formatOption.DefaultValue = "text";
-            formatOption.Accepts().Values("text", "detail", "json");
+            formatOption.Accepts().Values("text", "json");
             var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
             var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (JSON).", CommandOptionType.SingleValue);
             configOption.Accepts().ExistingFile();
@@ -112,10 +112,8 @@ namespace textgen
                 {
                     await File.WriteAllTextAsync(outputFile, formattedOutput, cancellationToken);
                 }
-                else
-                {
-                    Console.WriteLine(formattedOutput);
-                }
+                // Always output to console
+                Console.WriteLine(outputResult.Completion);
 
                 return 0;
             });
@@ -138,7 +136,10 @@ namespace textgen
         {
             switch (format?.ToLower())
             {
-                case "detail":
+                case "json":
+                    return JsonConvert.SerializeObject(this, Formatting.Indented); // Pretty format output
+
+                default: // text
                     return $"@date\n{Date}\n\n" +
                            $"@host\n{Host}\n\n" +
                            $"@model\n{Model}\n\n" +
@@ -146,16 +147,12 @@ namespace textgen
                            $"max_tokens={Config.MaxTokens}\n" +
                            $"seed={Config.Seed}\n" +
                            $"temperature={Config.Temperature}\n" +
-                           $"top_p={Config.TopP}\n\n" +
+                           $"top_p={Config.TopP}\n" +
+                           $"username={Config.Username}\n" +
+                           $"assistant_name={Config.AssistantName}\n\n" +
                            $"@system-prompt\n{SystemPrompt}\n\n" +
                            $"@prompt\n{Prompt}\n\n" +
                            $"@completion\n{Completion}";
-
-                case "json":
-                    return JsonConvert.SerializeObject(this, Formatting.Indented); // Pretty format output
-
-                default: // text
-                    return Completion;
             }
         }
     }
