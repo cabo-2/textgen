@@ -193,6 +193,9 @@ namespace textgen
             var lines = textContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var result = new OutputResult();
 
+            Dictionary<int, string> prompts = new Dictionary<int, string>();
+            Dictionary<int, string> completions = new Dictionary<int, string>();
+
             for (int i = 0; i < lines.Length; i++)
             {
                 var line = lines[i];
@@ -246,14 +249,25 @@ namespace textgen
                 }
                 else if (line.StartsWith("@history-prompt"))
                 {
-                    var prompt = lines[++i];
-                    var completionLine = lines[++i];
-                    if (completionLine.StartsWith("@history-completion"))
-                    {
-                        var completion = lines[++i];
-                        result.History.Add(new KeyValuePair<string, string>(prompt, completion));
-                    }
+                    var index = int.Parse(line.Split('_')[1]);
+                    prompts[index] = lines[++i];
                 }
+                else if (line.StartsWith("@history-completion"))
+                {
+                    var index = int.Parse(line.Split('_')[1]);
+                    completions[index] = lines[++i];
+                }
+            }
+
+            // Merge prompts and completions
+            var maxIndex = Math.Max(prompts.Count > 0 ? prompts.Keys.Max() : 0, completions.Count > 0 ? completions.Keys.Max() : 0);
+            for (int j = 1; j <= maxIndex; j++)
+            {
+                string prompt = null;
+                string completion = null;
+                prompts.TryGetValue(j, out prompt);
+                completions.TryGetValue(j, out completion);
+                result.History.Add(new KeyValuePair<string, string>(prompt, completion));
             }
 
             return result;
