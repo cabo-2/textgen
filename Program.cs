@@ -155,6 +155,83 @@ namespace textgen
                            $"@completion\n{Completion}";
             }
         }
+
+        public static async Task<OutputResult> LoadFromFileAsync(string filePath, CancellationToken cancellationToken)
+        {
+            if (!File.Exists(filePath))
+            {
+                throw new FileNotFoundException("File not found", filePath);
+            }
+
+            var fileContent = await File.ReadAllTextAsync(filePath, cancellationToken);
+            return filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? LoadFromJson(fileContent) : LoadFromText(fileContent);
+        }
+
+        private static OutputResult LoadFromJson(string jsonContent)
+        {
+            return JsonConvert.DeserializeObject<OutputResult>(jsonContent);
+        }
+
+        private static OutputResult LoadFromText(string textContent)
+        {
+            var lines = textContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var result = new OutputResult();
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i];
+
+                if (line.StartsWith("@date"))
+                {
+                    result.Date = lines[++i];
+                }
+                else if (line.StartsWith("@host"))
+                {
+                    result.Host = lines[++i];
+                }
+                else if (line.StartsWith("@config"))
+                {
+                    var config = new Config();
+                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
+                    {
+                        var configLine = lines[++i].Split(new[] { '=' }, 2);
+                        if (configLine.Length == 2)
+                        {
+                            var key = configLine[0].Trim();
+                            var value = configLine[1].Trim();
+                            switch (key)
+                            {
+                                case "max_tokens": config.MaxTokens = int.Parse(value); break;
+                                case "seed": config.Seed = int.Parse(value); break;
+                                case "temperature": config.Temperature = double.Parse(value); break;
+                                case "top_p": config.TopP = double.Parse(value); break;
+                                case "username": config.Username = value; break;
+                                case "assistant_name": config.AssistantName = value; break;
+                            }
+                        }
+                    }
+                    result.Config = config;
+                }
+                else if (line.StartsWith("@model"))
+                {
+                    result.Model = lines[++i];
+                }
+                else if (line.StartsWith("@system-prompt"))
+                {
+                    result.SystemPrompt = lines[++i];
+                }
+                else if (line.StartsWith("@prompt"))
+                {
+                    result.Prompt = lines[++i];
+                }
+                else if (line.StartsWith("@completion"))
+                {
+                    result.Completion = lines[++i];
+                }
+            }
+
+            return result;
+        }
     }
 
     public class Config
