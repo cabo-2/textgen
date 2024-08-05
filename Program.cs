@@ -92,7 +92,7 @@ namespace textgen
 
                 // Generate text
                 var textGenerator = new TextGenerator(httpClient, openAIHost);
-                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config.MaxTokens, config.Seed, config.Temperature, config.TopP, cancellationToken);
+                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config, cancellationToken);
 
                 // Create output object
                 var outputResult = new OutputResult
@@ -191,6 +191,8 @@ namespace textgen
         public int Seed { get; set; }
         public double Temperature { get; set; }
         public double TopP { get; set; }
+        public string Username { get; set; } = "user";
+        public string AssistantName { get; set; } = "assistant";
     }
 
     class TextGenerator
@@ -204,7 +206,7 @@ namespace textgen
             _apiHost = apiHost;
         }
 
-        public async Task<string> GenerateTextAsync(string model, string prompt, string systemPrompt, int maxTokens, int seed, double temperature, double topP, CancellationToken cancellationToken = default)
+        public async Task<string> GenerateTextAsync(string model, string prompt, string systemPrompt, Config config, CancellationToken cancellationToken = default)
         {
             var requestBody = new
             {
@@ -212,12 +214,13 @@ namespace textgen
                 messages = new[]
                 {
                     new { role = "system", content = systemPrompt ?? "" },
-                    new { role = "user", content = prompt }
+                    new { role = config.Username, content = prompt }
+                    //new { role = config.AssistantName, content = "" }
                 },
-                max_tokens = maxTokens,
-                seed = seed,
-                temperature = temperature,
-                top_p = topP
+                max_tokens = config.MaxTokens,
+                seed = config.Seed,
+                temperature = config.Temperature,
+                top_p = config.TopP
             };
 
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
