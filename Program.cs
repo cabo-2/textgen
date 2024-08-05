@@ -6,12 +6,11 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
-using McMaster.Extensions.CommandLineUtils.Validation;
 using Newtonsoft.Json;
 
 namespace textgen
 {
-    class Program
+    public class Program
     {
         private static readonly HttpClient httpClient = new HttpClient();
         private static string openAIHost;
@@ -35,7 +34,6 @@ namespace textgen
             var promptOption = app.Option("-p|--prompt <PROMPT>", "Input message directly.", CommandOptionType.SingleValue);
             var promptFileOption = app.Option("-P|--prompt-file <FNAME>", "Input message from a file.", CommandOptionType.SingleValue);
             var systemOption = app.Option("-s|--system <SYSTEM_PROMPT>", "System prompt directly.", CommandOptionType.SingleValue);
-            systemOption.DefaultValue = "";
             var systemFileOption = app.Option("-S|--system-file <FNAME>", "System prompt from a file.", CommandOptionType.SingleValue);
             var formatOption = app.Option("-f|--format <FORMAT>", "Output format (text, detail, json)", CommandOptionType.SingleValue);
             formatOption.DefaultValue = "text";
@@ -71,20 +69,7 @@ namespace textgen
                 string configFile = configOption.Value();
 
                 // Load parameters from config file if specified
-                int maxTokens = 1200;
-                int seed = 0;
-                double temperature = 0.7;
-                double topP = 1;
-
-                if (!string.IsNullOrEmpty(configFile))
-                {
-                    var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
-                    dynamic config = JsonConvert.DeserializeObject(configContent);
-                    maxTokens = config.max_tokens ?? maxTokens;
-                    seed = config.seed ?? seed;
-                    temperature = config.temperature ?? temperature;
-                    topP = config.top_p ?? topP;
-                }
+                var config = LoadConfig(configFile, cancellationToken);
 
                 // Load prompt from file if specified
                 if (!string.IsNullOrEmpty(promptFile))
@@ -105,19 +90,30 @@ namespace textgen
                     return 1;
                 }
 
-                // Use TextGenerator to call OpenAI API
+                // Generate text
                 var textGenerator = new TextGenerator(httpClient, openAIHost);
-                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, maxTokens, seed, temperature, topP, cancellationToken);
+                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config.MaxTokens, config.Seed, config.Temperature, config.TopP, cancellationToken);
 
-                // Output result
+                // Create output object
+                var outputResult = new OutputResult
+                {
+                    Date = DateTime.UtcNow.ToString("o"),
+                    Host = openAIHost,
+                    Model = model,
+                    Config = config,
+                    SystemPrompt = systemPrompt,
+                    Prompt = prompt,
+                    Completion = responseText
+                };
+
+                // Output result in the desired format
+                string formattedOutput = outputResult.Format(format);
                 if (!string.IsNullOrEmpty(outputFile))
                 {
-                    string formattedOutput = FormatOutput(format, model, prompt, systemPrompt, responseText, maxTokens, seed, temperature, topP);
                     await File.WriteAllTextAsync(outputFile, formattedOutput, cancellationToken);
                 }
                 else
                 {
-                    string formattedOutput = FormatOutput(format, model, prompt, systemPrompt, responseText, maxTokens, seed, temperature, topP);
                     Console.WriteLine(formattedOutput);
                 }
 
@@ -127,49 +123,74 @@ namespace textgen
             return await app.ExecuteAsync(args);
         }
 
-        private static string FormatOutput(string format, string model, string prompt, string systemPrompt, string completion, int maxTokens, int seed, double temperature, double topP)
+        private static Config LoadConfig(string configFile, CancellationToken cancellationToken)
         {
-            var date = DateTime.Now.ToString("o"); // ISO 8601 format date
-            var host = openAIHost; // Request URI
+            if (string.IsNullOrEmpty(configFile))
+            {
+                return new Config
+                {
+                    MaxTokens = 1200,
+                    Seed = 0,
+                    Temperature = 0.7,
+                    TopP = 1
+                };
+            }
 
+            var configContent = File.ReadAllText(configFile);
+            dynamic config = JsonConvert.DeserializeObject(configContent);
+
+            return new Config
+            {
+                MaxTokens = config.max_tokens ?? 1200,
+                Seed = config.seed ?? 0,
+                Temperature = config.temperature ?? 0.7,
+                TopP = config.top_p ?? 1
+            };
+        }
+    }
+
+    public class OutputResult
+    {
+        public string Date { get; set; }
+        public string Host { get; set; }
+        public string Model { get; set; }
+        public Config Config { get; set; }
+        public string SystemPrompt { get; set; }
+        public string Prompt { get; set; }
+        public string Completion { get; set; }
+
+        public string Format(string format)
+        {
             switch (format?.ToLower())
             {
                 case "detail":
-                    return $"@date\n{date}\n\n" +
-                           $"@host\n{host}\n\n" +
-                           $"@model\n{model}\n\n" +
+                    return $"@date\n{Date}\n\n" +
+                           $"@host\n{Host}\n\n" +
+                           $"@model\n{Model}\n\n" +
                            $"@config\n" +
-                           $"max_tokens={maxTokens}\n" +
-                           $"seed={seed}\n" +
-                           $"temperature={temperature}\n" +
-                           $"top_p={topP}\n\n" +
-                           $"@system-prompt\n{systemPrompt}\n\n" +
-                           $"@prompt\n{prompt}\n\n" +
-                           $"@completion\n{completion}";
+                           $"max_tokens={Config.MaxTokens}\n" +
+                           $"seed={Config.Seed}\n" +
+                           $"temperature={Config.Temperature}\n" +
+                           $"top_p={Config.TopP}\n\n" +
+                           $"@system-prompt\n{SystemPrompt}\n\n" +
+                           $"@prompt\n{Prompt}\n\n" +
+                           $"@completion\n{Completion}";
 
                 case "json":
-                    var jsonOutput = new
-                    {
-                        date = date,
-                        host = host,
-                        model = model,
-                        config = new
-                        {
-                            max_tokens = maxTokens,
-                            seed = seed,
-                            temperature = temperature,
-                            top_p = topP
-                        },
-                        system_prompt = systemPrompt,
-                        prompt = prompt,
-                        completion = completion
-                    };
-                    return JsonConvert.SerializeObject(jsonOutput, Formatting.Indented); // Pretty format output
+                    return JsonConvert.SerializeObject(this, Formatting.Indented); // Pretty format output
 
                 default: // text
-                    return completion;
+                    return Completion;
             }
         }
+    }
+
+    public class Config
+    {
+        public int MaxTokens { get; set; }
+        public int Seed { get; set; }
+        public double Temperature { get; set; }
+        public double TopP { get; set; }
     }
 
     class TextGenerator
