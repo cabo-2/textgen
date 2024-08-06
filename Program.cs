@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -42,6 +43,8 @@ namespace textgen
             var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
             var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (JSON).", CommandOptionType.SingleValue);
             configOption.Accepts().ExistingFile();
+            var conversationLogOption = app.Option("--conversation-log <FNAME>", "File to read and maintain conversation logs.", CommandOptionType.SingleValue);
+            conversationLogOption.Accepts().ExistingFile();
 
             app.HelpOption("-h|--help");
             app.VersionOption("-v|--version", "1.0.0");
@@ -68,6 +71,7 @@ namespace textgen
                 string format = formatOption.Value();
                 string outputFile = outputOption.Value();
                 string configFile = configOption.Value();
+                string conversationLogFile = conversationLogOption.Value();
 
                 // Load parameters from config file if specified
                 var config = await Config.LoadConfigAsync(configFile, cancellationToken);
@@ -84,6 +88,9 @@ namespace textgen
                     systemPrompt = await File.ReadAllTextAsync(systemPromptFile, cancellationToken);
                 }
 
+                // Load conversation history from log file
+                var outputResult = string.IsNullOrEmpty(conversationLogFile) ? new OutputResult() : await OutputResult.LoadFromFileAsync(conversationLogFile, cancellationToken);
+
                 // Validate inputs
                 if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
                 {
@@ -93,19 +100,19 @@ namespace textgen
 
                 // Generate text
                 var textGenerator = new TextGenerator(httpClient, openAIHost);
-                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config, cancellationToken);
+                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config, outputResult.History, cancellationToken);
 
-                // Create output object
-                var outputResult = new OutputResult
-                {
-                    Date = DateTime.UtcNow.ToString("o"),
-                    Host = openAIHost,
-                    Model = model,
-                    Config = config,
-                    SystemPrompt = systemPrompt,
-                    Prompt = prompt,
-                    Completion = responseText
-                };
+                // Update output result with new data
+                outputResult.Date = DateTime.UtcNow.ToString("o");
+                outputResult.Host = openAIHost;
+                outputResult.Model = model;
+                outputResult.Config = config;
+                outputResult.SystemPrompt = systemPrompt;
+                outputResult.Prompt = prompt;
+                outputResult.Completion = responseText;
+
+                // Add new history entries
+                outputResult.History.Add(new KeyValuePair<string, string>(prompt, responseText));
 
                 // Output result in the desired format
                 string formattedOutput = outputResult.Format(format);
@@ -115,6 +122,12 @@ namespace textgen
                 }
                 // Always output to console
                 Console.WriteLine(outputResult.Completion);
+
+                // Write to conversation log file
+                if (!string.IsNullOrEmpty(conversationLogFile))
+                {
+                    await File.WriteAllTextAsync(conversationLogFile, formattedOutput, cancellationToken);
+                }
 
                 return 0;
             });
@@ -326,16 +339,29 @@ namespace textgen
             _apiHost = apiHost;
         }
 
-        public async Task<string> GenerateTextAsync(string model, string prompt, string systemPrompt, Config config, CancellationToken cancellationToken = default)
+        public async Task<string> GenerateTextAsync(string model, string prompt, string systemPrompt, Config config, List<KeyValuePair<string, string>> history, CancellationToken cancellationToken = default)
         {
+            var messages = new List<dynamic>
+            {
+                new { role = "system", content = systemPrompt ?? "" }
+            };
+
+            // Add history to messages
+            foreach (var entry in history)
+            {
+                if (string.IsNullOrEmpty(entry.Key))
+                    messages.Add(new { role = config.Username, content = entry.Key });
+
+                if (string.IsNullOrEmpty(entry.Value))
+                    messages.Add(new { role = config.AssistantName, content = entry.Value });
+            }
+
+            messages.Add(new { role = config.Username, content = prompt }); // current user prompt
+
             var requestBody = new
             {
                 model = model,
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt ?? "" },
-                    new { role = config.Username, content = prompt }
-                },
+                messages = messages,
                 max_tokens = config.MaxTokens,
                 seed = config.Seed,
                 temperature = config.Temperature,
