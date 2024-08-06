@@ -337,10 +337,10 @@ namespace textgen
             // Add history to messages
             foreach (var entry in history)
             {
-                if (string.IsNullOrEmpty(entry.Key))
+                if (!string.IsNullOrEmpty(entry.Key))
                     messages.Add(new { role = config.Username, content = entry.Key });
 
-                if (string.IsNullOrEmpty(entry.Value))
+                if (!string.IsNullOrEmpty(entry.Value))
                     messages.Add(new { role = config.AssistantName, content = entry.Value });
             }
 
