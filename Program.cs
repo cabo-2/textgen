@@ -19,7 +19,7 @@ namespace textgen
 
         static Program()
         {
-            openAIHost = Environment.GetEnvironmentVariable("OPENAI_API_HOST") ?? "http://localhost:8081/v1/chat/completions";
+            openAIHost = Environment.GetEnvironmentVariable("OPENAI_API_HOST") ?? "http://localhost:8081/completion";
             httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
         }
 
@@ -77,7 +77,7 @@ namespace textgen
                 }
 
                 // Load conversation history from log file
-                var outputResult = string.IsNullOrEmpty(conversationLogFile) ? new OutputResult() : await OutputResult.LoadFromFileAsync(conversationLogFile, cancellationToken);
+                var conversationLog = string.IsNullOrEmpty(conversationLogFile) ? new OutputResult() : await OutputResult.LoadFromFileAsync(conversationLogFile, cancellationToken);
 
                 // Validate inputs
                 if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
@@ -88,19 +88,7 @@ namespace textgen
 
                 // Generate text
                 var textGenerator = new TextGenerator(httpClient, openAIHost);
-                var responseText = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config, outputResult.History, cancellationToken);
-
-                // Update output result with new data
-                outputResult.Date = DateTime.UtcNow.ToString("o");
-                outputResult.Host = openAIHost;
-                outputResult.Model = model;
-                outputResult.Config = config;
-                outputResult.SystemPrompt = systemPrompt;
-                outputResult.Prompt = prompt;
-                outputResult.Completion = responseText;
-
-                // Add new history entries
-                outputResult.History.Add(new KeyValuePair<string, string>(prompt, responseText));
+                OutputResult outputResult = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config, conversationLog, cancellationToken);
 
                 // Output result in the desired format
                 string formattedOutput = outputResult.Format(format);
@@ -110,12 +98,6 @@ namespace textgen
                 }
                 // Always output to console
                 Console.WriteLine(outputResult.Completion);
-
-                // Write to conversation log file
-                if (!string.IsNullOrEmpty(conversationLogFile))
-                {
-                    await File.WriteAllTextAsync(conversationLogFile, formattedOutput, cancellationToken);
-                }
 
                 return 0;
             });
@@ -133,7 +115,7 @@ namespace textgen
         public string SystemPrompt { get; set; }
         public string Prompt { get; set; }
         public string Completion { get; set; }
-        public List<KeyValuePair<string, string>> History { get; set; } = new List<KeyValuePair<string, string>>();
+        public List<(string Prompt, string Completion)> History { get; set; } = new List<(string, string)>();
 
         public string Format(string format)
         {
@@ -148,10 +130,17 @@ namespace textgen
                     sb.Append($"@host\n{Host}\n\n");
                     sb.Append($"@model\n{Model}\n\n");
                     sb.Append($"@config\n");
-                    sb.Append($"max_tokens={Config.MaxTokens}\n");
+                    sb.Append($"n_predict={Config.NPredict}\n");
                     sb.Append($"seed={Config.Seed}\n");
                     sb.Append($"temperature={Config.Temperature}\n");
+                    sb.Append($"top_k={Config.TopK}\n");
                     sb.Append($"top_p={Config.TopP}\n");
+                    sb.Append($"min_p={Config.MinP}\n");
+                    sb.Append($"presence_penalty={Config.PresencePenalty}\n");
+                    sb.Append($"frequency_penalty={Config.FrequencyPenalty}\n");
+                    sb.Append($"repeat_penalty={Config.RepeatPenalty}\n");
+                    sb.Append($"stream={Config.Stream.ToString().ToLower()}\n");
+                    sb.Append($"cache_prompt={Config.CachePrompt.ToString().ToLower()}\n");
                     sb.Append($"username={Config.Username}\n");
                     sb.Append($"assistant_name={Config.AssistantName}\n\n");
                     sb.Append($"@system-prompt\n{SystemPrompt}\n\n");
@@ -161,13 +150,13 @@ namespace textgen
                         for (int i = 0; i < History.Count; i++)
                         {
                             var history = History[i];
-                            sb.Append($"@history-prompt_{i + 1}\n{history.Key}\n\n");
-                            sb.Append($"@history-completion_{i + 1}\n{history.Value}\n\n");
+                            sb.Append($"@history-prompt_{i + 1}\n{history.Prompt}\n\n");
+                            sb.Append($"@history-completion_{i + 1}\n{history.Completion}\n\n");
                         }
                     }
 
                     sb.Append($"@prompt\n{Prompt}\n\n");
-                    sb.Append($"@completion\n{Completion}");
+                    sb.Append($"@completion\n{Completion}\n");
 
                     return sb.ToString();
             }
@@ -221,10 +210,17 @@ namespace textgen
                             var value = configLine[1].Trim();
                             switch (key)
                             {
-                                case "max_tokens": config.MaxTokens = int.Parse(value); break;
+                                case "n_predict": config.NPredict = int.Parse(value); break;
                                 case "seed": config.Seed = int.Parse(value); break;
                                 case "temperature": config.Temperature = double.Parse(value); break;
+                                case "top_k": config.TopK = int.Parse(value); break;
                                 case "top_p": config.TopP = double.Parse(value); break;
+                                case "min_p": config.MinP = double.Parse(value); break;
+                                case "presence_penalty": config.PresencePenalty = double.Parse(value); break;
+                                case "frequency_penalty": config.FrequencyPenalty = double.Parse(value); break;
+                                case "repeat_penalty": config.RepeatPenalty = double.Parse(value); break;
+                                case "stream": config.Stream = bool.Parse(value); break;
+                                case "cache_prompt": config.CachePrompt = bool.Parse(value); break;
                                 case "username": config.Username = value; break;
                                 case "assistant_name": config.AssistantName = value; break;
                             }
@@ -240,14 +236,6 @@ namespace textgen
                 {
                     result.SystemPrompt = lines[++i];
                 }
-                else if (line.StartsWith("@prompt"))
-                {
-                    result.Prompt = lines[++i];
-                }
-                else if (line.StartsWith("@completion"))
-                {
-                    result.Completion = lines[++i];
-                }
                 else if (line.StartsWith("@history-prompt"))
                 {
                     var index = int.Parse(line.Split('_')[1]);
@@ -257,6 +245,14 @@ namespace textgen
                 {
                     var index = int.Parse(line.Split('_')[1]);
                     completions[index] = lines[++i];
+                }
+                else if (line.StartsWith("@prompt"))
+                {
+                    result.Prompt = lines[++i];
+                }
+                else if (line.StartsWith("@completion"))
+                {
+                    result.Completion = lines[++i];
                 }
             }
 
@@ -268,7 +264,7 @@ namespace textgen
                 string completion = null;
                 prompts.TryGetValue(j, out prompt);
                 completions.TryGetValue(j, out completion);
-                result.History.Add(new KeyValuePair<string, string>(prompt, completion));
+                result.History.Add((prompt, completion));
             }
 
             return result;
@@ -279,18 +275,32 @@ namespace textgen
     {
         public static readonly Config DefaultConfig = new Config
         {
-            MaxTokens = 1200,
-            Seed = 0,
+            NPredict = 1200,
+            Seed = 1337,
             Temperature = 0.7,
-            TopP = 1,
+            TopK = 50,
+            TopP = 0.9,
+            MinP = 0.1,
+            PresencePenalty = 0.0,
+            FrequencyPenalty = 0.0,
+            RepeatPenalty = 1.1,
+            Stream = false,
+            CachePrompt = true,
             Username = "user",
             AssistantName = "assistant"
         };
 
-        public int MaxTokens { get; set; }
+        public int NPredict { get; set; }
         public int Seed { get; set; }
         public double Temperature { get; set; }
+        public int TopK { get; set; }
         public double TopP { get; set; }
+        public double MinP { get; set; }
+        public double PresencePenalty { get; set; }
+        public double FrequencyPenalty { get; set; }
+        public double RepeatPenalty { get; set; }
+        public bool Stream { get; set; }
+        public bool CachePrompt { get; set; }
         public string Username { get; set; }
         public string AssistantName { get; set; }
 
@@ -306,10 +316,17 @@ namespace textgen
 
             return new Config
             {
-                MaxTokens = config.max_tokens ?? DefaultConfig.MaxTokens,
+                NPredict = config.n_predict ?? DefaultConfig.NPredict,
                 Seed = config.seed ?? DefaultConfig.Seed,
                 Temperature = config.temperature ?? DefaultConfig.Temperature,
+                TopK = config.top_k ?? DefaultConfig.TopK,
                 TopP = config.top_p ?? DefaultConfig.TopP,
+                MinP = config.min_p ?? DefaultConfig.MinP,
+                PresencePenalty = config.presence_penalty ?? DefaultConfig.PresencePenalty,
+                FrequencyPenalty = config.frequency_penalty ?? DefaultConfig.FrequencyPenalty,
+                RepeatPenalty = config.repeat_penalty ?? DefaultConfig.RepeatPenalty,
+                Stream = config.stream ?? DefaultConfig.Stream,
+                CachePrompt = config.cache_prompt ?? DefaultConfig.CachePrompt,
                 Username = config.username ?? DefaultConfig.Username,
                 AssistantName = config.assistant_name ?? DefaultConfig.AssistantName
             };
@@ -327,34 +344,64 @@ namespace textgen
             _apiHost = apiHost;
         }
 
-        public async Task<string> GenerateTextAsync(string model, string prompt, string systemPrompt, Config config, List<KeyValuePair<string, string>> history, CancellationToken cancellationToken = default)
+        public async Task<OutputResult> GenerateTextAsync(string model, string prompt, string systemPrompt, Config config, OutputResult conversationLog, CancellationToken cancellationToken = default)
         {
-            var messages = new List<dynamic>
+            if (config.Stream)
             {
-                new { role = "system", content = systemPrompt ?? "" }
-            };
-
-            // Add history to messages
-            foreach (var entry in history)
-            {
-                if (!string.IsNullOrEmpty(entry.Key))
-                    messages.Add(new { role = config.Username, content = entry.Key });
-
-                if (!string.IsNullOrEmpty(entry.Value))
-                    messages.Add(new { role = config.AssistantName, content = entry.Value });
+                Console.Error.WriteLine("Warning: stream is set to true, but it is not supported. Setting to false.");
+                config.Stream = false;
             }
 
-            messages.Add(new { role = config.Username, content = prompt }); // current user prompt
+            StringBuilder sb = new StringBuilder();
+            var history = new List<(string, string)>();
+
+            // Add system-prompt to request prompt
+            if (!string.IsNullOrEmpty(systemPrompt))            
+                sb.Append($"{systemPrompt}\n\n");
+
+            // Add conversation history to request prompt
+            foreach (var entry in conversationLog.History)
+            {
+                if (!string.IsNullOrEmpty(entry.Prompt))
+                    sb.Append($"{config.Username}: {entry.Prompt}\n\n");
+
+                if (!string.IsNullOrEmpty(entry.Completion))
+                    sb.Append($"{config.AssistantName}: {entry.Completion}\n\n");
+
+                if(!string.IsNullOrEmpty(entry.Prompt) || !string.IsNullOrEmpty(entry.Completion))
+                    history.Add((entry.Prompt ?? "", entry.Completion ?? ""));
+            }
+
+            if (!string.IsNullOrEmpty(conversationLog.Prompt))
+                sb.Append($"{config.Username}: {conversationLog.Prompt}\n\n");
+
+            if (!string.IsNullOrEmpty(conversationLog.Completion))
+                sb.Append($"{config.AssistantName}: {conversationLog.Completion}\n\n");
+
+            if (!string.IsNullOrEmpty(conversationLog.Prompt) || !string.IsNullOrEmpty(conversationLog.Completion))
+                history.Add((conversationLog.Prompt ?? "", conversationLog.Completion ?? ""));
+
+            // Add prompt to request prompt
+            sb.Append($"{config.Username}: {prompt}\n\n");
+            sb.Append($"{config.AssistantName}: ");
 
             var requestBody = new
             {
-                model = model,
-                messages = messages,
-                max_tokens = config.MaxTokens,
+                prompt = sb.ToString(),
+                n_predict = config.NPredict,
                 seed = config.Seed,
                 temperature = config.Temperature,
-                top_p = config.TopP
+                top_k = config.TopK,
+                top_p = config.TopP,
+                min_p = config.MinP,
+                presence_penalty = config.PresencePenalty,
+                frequency_penalty = config.FrequencyPenalty,
+                repeat_penalty = config.RepeatPenalty,
+                stream = config.Stream,
+                cache_prompt = config.CachePrompt
             };
+
+            Console.Write(sb.ToString());
 
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
             var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
@@ -365,7 +412,23 @@ namespace textgen
             var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
             dynamic result = JsonConvert.DeserializeObject(jsonResponse);
 
-            return result.choices[0].message.content.ToString();
+            if (result.stop != "true")
+            {
+                Console.Error.WriteLine("Warning: stop field is false.");
+            }
+
+            // Generate result data
+            var outputResult = new OutputResult();
+            outputResult.Date = DateTime.UtcNow.ToString("o");
+            outputResult.Host = _apiHost;
+            outputResult.Model = model;
+            outputResult.Config = config;
+            outputResult.SystemPrompt = systemPrompt;
+            outputResult.History = history;
+            outputResult.Prompt = prompt.Trim();
+            outputResult.Completion = result.content.ToString().Trim();            
+
+            return outputResult;
         }
     }
 }
