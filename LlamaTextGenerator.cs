@@ -104,5 +104,7 @@ namespace textgen
                 Completion = result.content.ToString().Trim()
             };
         }
+
+        public override IConfig CreateDefaultConfig() => LlamaConfig.Create();
     }
 }

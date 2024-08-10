@@ -61,8 +61,12 @@ namespace textgen
                 string configFile = configOption.Value();
                 string conversationLogFile = conversationLogOption.Value();
 
+                // Determine the text generator and configuration to use
+                var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient);
+                var defaultConfig = textGenerator.CreateDefaultConfig();
+
                 // Load parameters from config file if specified
-                var config = await LlamaConfig.LoadConfigAsync(configFile, cancellationToken);
+                var config = await defaultConfig.LoadConfigAsync(configFile, cancellationToken);
 
                 // Load prompt from file if specified
                 if (!string.IsNullOrEmpty(promptFile))
@@ -77,7 +81,7 @@ namespace textgen
                 }
 
                 // Load conversation history from log file
-                var conversationLog = string.IsNullOrEmpty(conversationLogFile) ? new OutputResult() : await OutputResult.LoadFromFileAsync(conversationLogFile, cancellationToken);
+                var conversationLog = string.IsNullOrEmpty(conversationLogFile) ? new OutputResult() : await OutputResult.LoadFromFileAsync(conversationLogFile, defaultConfig, cancellationToken);
 
                 // Validate inputs
                 if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
@@ -86,8 +90,6 @@ namespace textgen
                     return 1;
                 }
 
-                // Generate text
-                var textGenerator = new LlamaTextGenerator(httpClient, openAIHost);
                 OutputResult outputResult = await textGenerator.GenerateTextAsync(model, prompt, system, config, conversationLog, cancellationToken);
 
                 // Output result in the desired format

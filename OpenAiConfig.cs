@@ -9,7 +9,7 @@ namespace textgen
 {
     public class OpenAiConfig : IConfig
     {
-        public static readonly OpenAiConfig DefaultConfig = new OpenAiConfig
+        public static OpenAiConfig Create() => new OpenAiConfig
         {
             MaxTokens = 1200,
             Seed = 0,
@@ -26,24 +26,25 @@ namespace textgen
         public string Username { get; set; }
         public string AssistantName { get; set; }
 
-        public static async Task<IConfig> LoadConfigAsync(string configFile, CancellationToken cancellationToken)
+        public async Task<IConfig> LoadConfigAsync(string configFile, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(configFile))
             {
-                return DefaultConfig; // Use default values
+                return Create(); // Use default values
             }
 
             var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
+            var value = Create();
             dynamic config = JsonConvert.DeserializeObject(configContent);
 
             return new OpenAiConfig
             {
-                MaxTokens = config.max_tokens ?? DefaultConfig.MaxTokens,
-                Seed = config.seed ?? DefaultConfig.Seed,
-                Temperature = config.temperature ?? DefaultConfig.Temperature,
-                TopP = config.top_p ?? DefaultConfig.TopP,
-                Username = config.username ?? DefaultConfig.Username,
-                AssistantName = config.assistant_name ?? DefaultConfig.AssistantName
+                MaxTokens = config.max_tokens ?? value.MaxTokens,
+                Seed = config.seed ?? value.Seed,
+                Temperature = config.temperature ?? value.Temperature,
+                TopP = config.top_p ?? value.TopP,
+                Username = config.username ?? value.Username,
+                AssistantName = config.assistant_name ?? value.AssistantName
             };
         }
 
@@ -57,6 +58,11 @@ namespace textgen
             sb.Append($"username={Username}\n");
             sb.Append($"assistant_name={AssistantName}\n");
             return sb.ToString();
+        }
+
+        public IConfig LoadFromText(string textContent)
+        {
+            throw new NotSupportedException();
         }
     }
 }

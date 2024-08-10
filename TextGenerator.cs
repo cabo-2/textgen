@@ -24,5 +24,7 @@ namespace textgen
         }
 
         public abstract Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default);
+
+        public abstract IConfig CreateDefaultConfig();
     }
 }

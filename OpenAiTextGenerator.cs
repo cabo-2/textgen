@@ -15,7 +15,7 @@ namespace textgen
     public class OpenAiTextGenerator : TextGenerator
     {
         public OpenAiTextGenerator(HttpClient httpClient, string apiHost) : base(httpClient, apiHost)
-        {}
+        { }
 
         public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
         {
@@ -83,5 +83,7 @@ namespace textgen
                 Completion = result.choices[0].message.content.ToString().Trim()
             };
         }
+
+        public override IConfig CreateDefaultConfig() => OpenAiConfig.Create();
     }
 }

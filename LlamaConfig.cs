@@ -9,7 +9,7 @@ namespace textgen
 {
     public class LlamaConfig : IConfig
     {
-        public static readonly LlamaConfig DefaultConfig = new LlamaConfig
+        public static LlamaConfig Create() => new LlamaConfig
         {
             NPredict = 1200,
             Seed = 1337,
@@ -40,31 +40,32 @@ namespace textgen
         public string Username { get; set; }
         public string AssistantName { get; set; }
 
-        public static async Task<IConfig> LoadConfigAsync(string configFile, CancellationToken cancellationToken)
+        public async Task<IConfig> LoadConfigAsync(string configFile, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(configFile))
             {
-                return DefaultConfig; // Use default values
+                return Create(); // Use default values
             }
 
             var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
+            var value = Create();
             dynamic config = JsonConvert.DeserializeObject(configContent);
 
             return new LlamaConfig
             {
-                NPredict = config.n_predict ?? DefaultConfig.NPredict,
-                Seed = config.seed ?? DefaultConfig.Seed,
-                Temperature = config.temperature ?? DefaultConfig.Temperature,
-                TopK = config.top_k ?? DefaultConfig.TopK,
-                TopP = config.top_p ?? DefaultConfig.TopP,
-                MinP = config.min_p ?? DefaultConfig.MinP,
-                PresencePenalty = config.presence_penalty ?? DefaultConfig.PresencePenalty,
-                FrequencyPenalty = config.frequency_penalty ?? DefaultConfig.FrequencyPenalty,
-                RepeatPenalty = config.repeat_penalty ?? DefaultConfig.RepeatPenalty,
-                Stream = config.stream ?? DefaultConfig.Stream,
-                CachePrompt = config.cache_prompt ?? DefaultConfig.CachePrompt,
-                Username = config.username ?? DefaultConfig.Username,
-                AssistantName = config.assistant_name ?? DefaultConfig.AssistantName
+                NPredict = config.n_predict ?? value.NPredict,
+                Seed = config.seed ?? value.Seed,
+                Temperature = config.temperature ?? value.Temperature,
+                TopK = config.top_k ?? value.TopK,
+                TopP = config.top_p ?? value.TopP,
+                MinP = config.min_p ?? value.MinP,
+                PresencePenalty = config.presence_penalty ?? value.PresencePenalty,
+                FrequencyPenalty = config.frequency_penalty ?? value.FrequencyPenalty,
+                RepeatPenalty = config.repeat_penalty ?? value.RepeatPenalty,
+                Stream = config.stream ?? value.Stream,
+                CachePrompt = config.cache_prompt ?? value.CachePrompt,
+                Username = config.username ?? value.Username,
+                AssistantName = config.assistant_name ?? value.AssistantName
             };
         }
 
@@ -85,6 +86,11 @@ namespace textgen
             sb.Append($"username={Username}\n");
             sb.Append($"assistant_name={AssistantName}\n");
             return sb.ToString();
+        }
+
+        public IConfig LoadFromText(string textContent)
+        {
+            throw new NotSupportedException();
         }
     }
 }

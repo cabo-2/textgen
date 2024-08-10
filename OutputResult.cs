@@ -54,7 +54,7 @@ namespace textgen
             }
         }
 
-        public static async Task<OutputResult> LoadFromFileAsync(string filePath, CancellationToken cancellationToken)
+        public static async Task<OutputResult> LoadFromFileAsync(string filePath, IConfig defaultConfig, CancellationToken cancellationToken)
         {
             if (!File.Exists(filePath))
             {
@@ -62,7 +62,7 @@ namespace textgen
             }
 
             var fileContent = await File.ReadAllTextAsync(filePath, cancellationToken);
-            return filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? LoadFromJson(fileContent) : LoadFromText(fileContent);
+            return filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? LoadFromJson(fileContent) : LoadFromText(fileContent, defaultConfig);
         }
 
         private static OutputResult LoadFromJson(string jsonContent)
@@ -70,7 +70,7 @@ namespace textgen
             return JsonConvert.DeserializeObject<OutputResult>(jsonContent);
         }
 
-        private static OutputResult LoadFromText(string textContent)
+        private static OutputResult LoadFromText(string textContent, IConfig defaultConfig)
         {
             var lines = textContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var result = new OutputResult();
@@ -92,33 +92,59 @@ namespace textgen
                 }
                 else if (line.StartsWith("@config"))
                 {
-                    var config = new LlamaConfig();
-                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
+                    if (true)
                     {
-                        var configLine = lines[++i].Split(new[] { '=' }, 2);
-                        if (configLine.Length == 2)
+                        var config = new LlamaConfig();
+                        while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
                         {
-                            var key = configLine[0].Trim();
-                            var value = configLine[1].Trim();
-                            switch (key)
+                            var configLine = lines[++i].Split(new[] { '=' }, 2);
+                            if (configLine.Length == 2)
                             {
-                                case "n_predict": config.NPredict = int.Parse(value); break;
-                                case "seed": config.Seed = int.Parse(value); break;
-                                case "temperature": config.Temperature = double.Parse(value); break;
-                                case "top_k": config.TopK = int.Parse(value); break;
-                                case "top_p": config.TopP = double.Parse(value); break;
-                                case "min_p": config.MinP = double.Parse(value); break;
-                                case "presence_penalty": config.PresencePenalty = double.Parse(value); break;
-                                case "frequency_penalty": config.FrequencyPenalty = double.Parse(value); break;
-                                case "repeat_penalty": config.RepeatPenalty = double.Parse(value); break;
-                                case "stream": config.Stream = bool.Parse(value); break;
-                                case "cache_prompt": config.CachePrompt = bool.Parse(value); break;
-                                case "username": config.Username = value; break;
-                                case "assistant_name": config.AssistantName = value; break;
+                                var key = configLine[0].Trim();
+                                var value = configLine[1].Trim();
+                                switch (key)
+                                {
+                                    case "n_predict": config.NPredict = int.Parse(value); break;
+                                    case "seed": config.Seed = int.Parse(value); break;
+                                    case "temperature": config.Temperature = double.Parse(value); break;
+                                    case "top_k": config.TopK = int.Parse(value); break;
+                                    case "top_p": config.TopP = double.Parse(value); break;
+                                    case "min_p": config.MinP = double.Parse(value); break;
+                                    case "presence_penalty": config.PresencePenalty = double.Parse(value); break;
+                                    case "frequency_penalty": config.FrequencyPenalty = double.Parse(value); break;
+                                    case "repeat_penalty": config.RepeatPenalty = double.Parse(value); break;
+                                    case "stream": config.Stream = bool.Parse(value); break;
+                                    case "cache_prompt": config.CachePrompt = bool.Parse(value); break;
+                                    case "username": config.Username = value; break;
+                                    case "assistant_name": config.AssistantName = value; break;
+                                }
                             }
                         }
+                        result.Config = config;
                     }
-                    result.Config = config;
+                    else
+                    {
+                        var config = new OpenAiConfig();
+                        while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
+                        {
+                            var configLine = lines[++i].Split(new[] { '=' }, 2);
+                            if (configLine.Length == 2)
+                            {
+                                var key = configLine[0].Trim();
+                                var value = configLine[1].Trim();
+                                switch (key)
+                                {
+                                    case "max_tokens": config.MaxTokens = int.Parse(value); break;
+                                    case "seed": config.Seed = int.Parse(value); break;
+                                    case "temperature": config.Temperature = double.Parse(value); break;
+                                    case "top_p": config.TopP = double.Parse(value); break;
+                                    case "username": config.Username = value; break;
+                                    case "assistant_name": config.AssistantName = value; break;
+                                }
+                            }
+                        }
+                        result.Config = config;
+                    }
                 }
                 else if (line.StartsWith("@model"))
                 {
