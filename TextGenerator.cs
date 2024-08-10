@@ -23,8 +23,9 @@ namespace textgen
             _apiHost = apiHost;
         }
 
-        public async Task<OutputResult> GenerateTextAsync(string model, string prompt, string systemPrompt, Config config, OutputResult conversationLog, CancellationToken cancellationToken = default)
+        public async Task<OutputResult> GenerateTextAsync(string model, string prompt, string systemPrompt, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
         {
+            LlamaCppConfig config = conf as LlamaCppConfig;
             if (config.Stream)
             {
                 Console.Error.WriteLine("Warning: stream is set to true, but it is not supported. Setting to false.");

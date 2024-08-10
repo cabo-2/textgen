@@ -1,20 +1,15 @@
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 
 namespace textgen
 {
-    public class Config
+    public class LlamaCppConfig : IConfig
     {
-        public static readonly Config DefaultConfig = new Config
+        public static readonly LlamaCppConfig DefaultConfig = new LlamaCppConfig
         {
             NPredict = 1200,
             Seed = 1337,
@@ -45,7 +40,7 @@ namespace textgen
         public string Username { get; set; }
         public string AssistantName { get; set; }
 
-        public static async Task<Config> LoadConfigAsync(string configFile, CancellationToken cancellationToken)
+        public static async Task<IConfig> LoadConfigAsync(string configFile, CancellationToken cancellationToken)
         {
             if (string.IsNullOrEmpty(configFile))
             {
@@ -55,7 +50,7 @@ namespace textgen
             var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
             dynamic config = JsonConvert.DeserializeObject(configContent);
 
-            return new Config
+            return new LlamaCppConfig
             {
                 NPredict = config.n_predict ?? DefaultConfig.NPredict,
                 Seed = config.seed ?? DefaultConfig.Seed,
@@ -71,6 +66,25 @@ namespace textgen
                 Username = config.username ?? DefaultConfig.Username,
                 AssistantName = config.assistant_name ?? DefaultConfig.AssistantName
             };
+        }
+
+        public string FormatConfig()
+        {
+            var sb = new StringBuilder();
+            sb.Append($"n_predict={NPredict}\n");
+            sb.Append($"seed={Seed}\n");
+            sb.Append($"temperature={Temperature}\n");
+            sb.Append($"top_k={TopK}\n");
+            sb.Append($"top_p={TopP}\n");
+            sb.Append($"min_p={MinP}\n");
+            sb.Append($"presence_penalty={PresencePenalty}\n");
+            sb.Append($"frequency_penalty={FrequencyPenalty}\n");
+            sb.Append($"repeat_penalty={RepeatPenalty}\n");
+            sb.Append($"stream={Stream.ToString().ToLower()}\n");
+            sb.Append($"cache_prompt={CachePrompt.ToString().ToLower()}\n");
+            sb.Append($"username={Username}\n");
+            sb.Append($"assistant_name={AssistantName}\n");
+            return sb.ToString();
         }
     }
 }

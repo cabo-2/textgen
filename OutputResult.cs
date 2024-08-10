@@ -2,12 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 
 namespace textgen
@@ -17,7 +14,7 @@ namespace textgen
         public string Date { get; set; }
         public string Host { get; set; }
         public string Model { get; set; }
-        public Config Config { get; set; }
+        public IConfig Config { get; set; }
         public string SystemPrompt { get; set; }
         public string Prompt { get; set; }
         public string Completion { get; set; }
@@ -36,19 +33,8 @@ namespace textgen
                     sb.Append($"@host\n{Host}\n\n");
                     sb.Append($"@model\n{Model}\n\n");
                     sb.Append($"@config\n");
-                    sb.Append($"n_predict={Config.NPredict}\n");
-                    sb.Append($"seed={Config.Seed}\n");
-                    sb.Append($"temperature={Config.Temperature}\n");
-                    sb.Append($"top_k={Config.TopK}\n");
-                    sb.Append($"top_p={Config.TopP}\n");
-                    sb.Append($"min_p={Config.MinP}\n");
-                    sb.Append($"presence_penalty={Config.PresencePenalty}\n");
-                    sb.Append($"frequency_penalty={Config.FrequencyPenalty}\n");
-                    sb.Append($"repeat_penalty={Config.RepeatPenalty}\n");
-                    sb.Append($"stream={Config.Stream.ToString().ToLower()}\n");
-                    sb.Append($"cache_prompt={Config.CachePrompt.ToString().ToLower()}\n");
-                    sb.Append($"username={Config.Username}\n");
-                    sb.Append($"assistant_name={Config.AssistantName}\n\n");
+                    sb.Append(Config.FormatConfig());
+                    sb.Append("\n");
                     sb.Append($"@system-prompt\n{SystemPrompt}\n\n");
 
                     if (History.Count > 0)
@@ -106,7 +92,7 @@ namespace textgen
                 }
                 else if (line.StartsWith("@config"))
                 {
-                    var config = new Config();
+                    var config = new LlamaCppConfig();
                     while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
                     {
                         var configLine = lines[++i].Split(new[] { '=' }, 2);

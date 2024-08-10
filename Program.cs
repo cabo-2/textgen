@@ -62,7 +62,7 @@ namespace textgen
                 string conversationLogFile = conversationLogOption.Value();
 
                 // Load parameters from config file if specified
-                var config = await Config.LoadConfigAsync(configFile, cancellationToken);
+                var config = await LlamaCppConfig.LoadConfigAsync(configFile, cancellationToken);
 
                 // Load prompt from file if specified
                 if (!string.IsNullOrEmpty(promptFile))
