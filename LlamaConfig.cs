@@ -7,9 +7,9 @@ using Newtonsoft.Json;
 
 namespace textgen
 {
-    public class LlamaCppConfig : IConfig
+    public class LlamaConfig : IConfig
     {
-        public static readonly LlamaCppConfig DefaultConfig = new LlamaCppConfig
+        public static readonly LlamaConfig DefaultConfig = new LlamaConfig
         {
             NPredict = 1200,
             Seed = 1337,
@@ -50,7 +50,7 @@ namespace textgen
             var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
             dynamic config = JsonConvert.DeserializeObject(configContent);
 
-            return new LlamaCppConfig
+            return new LlamaConfig
             {
                 NPredict = config.n_predict ?? DefaultConfig.NPredict,
                 Seed = config.seed ?? DefaultConfig.Seed,

@@ -12,15 +12,15 @@ using Newtonsoft.Json;
 
 namespace textgen
 {
-    public class LlamaCppTextGenerator : TextGenerator
+    public class LlamaTextGenerator : TextGenerator
     {
-        public LlamaCppTextGenerator(HttpClient httpClient, string apiHost) : base(httpClient, apiHost)
-        {}
+        public LlamaTextGenerator(HttpClient httpClient, string apiHost) : base(httpClient, apiHost)
+        { }
 
         public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string systemPrompt, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
         {
-            LlamaCppConfig config = conf as LlamaCppConfig;
-            
+            LlamaConfig config = conf as LlamaConfig;
+
             if (config.Stream)
             {
                 Console.Error.WriteLine("Warning: stream is set to true, but it is not supported. Setting to false.");

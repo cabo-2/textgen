@@ -62,7 +62,7 @@ namespace textgen
                 string conversationLogFile = conversationLogOption.Value();
 
                 // Load parameters from config file if specified
-                var config = await LlamaCppConfig.LoadConfigAsync(configFile, cancellationToken);
+                var config = await LlamaConfig.LoadConfigAsync(configFile, cancellationToken);
 
                 // Load prompt from file if specified
                 if (!string.IsNullOrEmpty(promptFile))
@@ -87,7 +87,7 @@ namespace textgen
                 }
 
                 // Generate text
-                var textGenerator = new LlamaCppTextGenerator(httpClient, openAIHost);
+                var textGenerator = new LlamaTextGenerator(httpClient, openAIHost);
                 OutputResult outputResult = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config, conversationLog, cancellationToken);
 
                 // Output result in the desired format

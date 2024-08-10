@@ -92,7 +92,7 @@ namespace textgen
                 }
                 else if (line.StartsWith("@config"))
                 {
-                    var config = new LlamaCppConfig();
+                    var config = new LlamaConfig();
                     while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
                     {
                         var configLine = lines[++i].Split(new[] { '=' }, 2);
