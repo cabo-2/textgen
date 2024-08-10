@@ -87,7 +87,7 @@ namespace textgen
                 }
 
                 // Generate text
-                var textGenerator = new TextGenerator(httpClient, openAIHost);
+                var textGenerator = new LlamaCppTextGenerator(httpClient, openAIHost);
                 OutputResult outputResult = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config, conversationLog, cancellationToken);
 
                 // Output result in the desired format
