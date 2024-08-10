@@ -92,18 +92,17 @@ namespace textgen
                 Console.Error.WriteLine("Warning: stop field is false.");
             }
 
-            // Generate result data
-            var outputResult = new OutputResult();
-            outputResult.Date = DateTime.UtcNow.ToString("o");
-            outputResult.Host = _apiHost;
-            outputResult.Model = model;
-            outputResult.Config = config;
-            outputResult.SystemPrompt = systemPrompt;
-            outputResult.History = history;
-            outputResult.Prompt = prompt.Trim();
-            outputResult.Completion = result.content.ToString().Trim();
-
-            return outputResult;
+            return new OutputResult
+            {
+                Date = DateTime.UtcNow.ToString("o"),
+                Host = _apiHost,
+                Model = model,
+                Config = config,
+                SystemPrompt = systemPrompt,
+                History = history,
+                Prompt = prompt.Trim(),
+                Completion = result.content.ToString().Trim()
+            };
         }
     }
 }
