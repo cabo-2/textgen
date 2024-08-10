@@ -23,6 +23,6 @@ namespace textgen
             _apiHost = apiHost;
         }
 
-        public abstract Task<OutputResult> GenerateTextAsync(string model, string prompt, string systemPrompt, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default);
+        public abstract Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default);
     }
 }

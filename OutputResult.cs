@@ -15,7 +15,7 @@ namespace textgen
         public string Host { get; set; }
         public string Model { get; set; }
         public IConfig Config { get; set; }
-        public string SystemPrompt { get; set; }
+        public string System { get; set; }
         public string Prompt { get; set; }
         public string Completion { get; set; }
         public List<(string Prompt, string Completion)> History { get; set; } = new List<(string, string)>();
@@ -35,7 +35,7 @@ namespace textgen
                     sb.Append($"@config\n");
                     sb.Append(Config.FormatConfig());
                     sb.Append("\n");
-                    sb.Append($"@system-prompt\n{SystemPrompt}\n\n");
+                    sb.Append($"@system\n{System}\n\n");
 
                     if (History.Count > 0)
                     {
@@ -124,9 +124,9 @@ namespace textgen
                 {
                     result.Model = lines[++i];
                 }
-                else if (line.StartsWith("@system-prompt"))
+                else if (line.StartsWith("@system"))
                 {
-                    result.SystemPrompt = lines[++i];
+                    result.System = lines[++i];
                 }
                 else if (line.StartsWith("@history-prompt"))
                 {

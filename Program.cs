@@ -34,16 +34,16 @@ namespace textgen
             // Command-line arguments
             var modelOption = app.Option("-m|--model <MODEL>", "Specify the model to use (gpt-3.5-turbo, gpt-4).", CommandOptionType.SingleValue);
             var promptOption = app.Option("-p|--prompt <PROMPT>", "Input message directly.", CommandOptionType.SingleValue);
-            var promptFileOption = app.Option("-pf|--prompt-file <FNAME>", "Input message from a file.", CommandOptionType.SingleValue);
+            var promptFileOption = app.Option("-P|--prompt-file <FNAME>", "Input message from a file.", CommandOptionType.SingleValue);
             var systemOption = app.Option("-s|--system <SYSTEM_PROMPT>", "System prompt directly.", CommandOptionType.SingleValue);
-            var systemFileOption = app.Option("-sf|--system-file <FNAME>", "System prompt from a file.", CommandOptionType.SingleValue);
+            var systemFileOption = app.Option("-S|--system-file <FNAME>", "System prompt from a file.", CommandOptionType.SingleValue);
             var formatOption = app.Option("-f|--format <FORMAT>", "Output format (text, json)", CommandOptionType.SingleValue);
             formatOption.DefaultValue = "text";
             formatOption.Accepts().Values("text", "json");
             var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
             var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (JSON).", CommandOptionType.SingleValue);
             configOption.Accepts().ExistingFile();
-            var conversationLogOption = app.Option("-cl|--conversation-log <FNAME>", "File to read and maintain conversation logs.", CommandOptionType.SingleValue);
+            var conversationLogOption = app.Option("-l|--conversation-log <FNAME>", "File to read and maintain conversation logs.", CommandOptionType.SingleValue);
             conversationLogOption.Accepts().ExistingFile();
 
             app.HelpOption("-h|--help");
@@ -54,8 +54,8 @@ namespace textgen
                 string model = modelOption.Value();
                 string prompt = promptOption.Value();
                 string promptFile = promptFileOption.Value();
-                string systemPrompt = systemOption.Value();
-                string systemPromptFile = systemFileOption.Value();
+                string system = systemOption.Value();
+                string systemFile = systemFileOption.Value();
                 string format = formatOption.Value();
                 string outputFile = outputOption.Value();
                 string configFile = configOption.Value();
@@ -71,9 +71,9 @@ namespace textgen
                 }
 
                 // Load system prompt from file if specified
-                if (!string.IsNullOrEmpty(systemPromptFile))
+                if (!string.IsNullOrEmpty(systemFile))
                 {
-                    systemPrompt = await File.ReadAllTextAsync(systemPromptFile, cancellationToken);
+                    system = await File.ReadAllTextAsync(systemFile, cancellationToken);
                 }
 
                 // Load conversation history from log file
@@ -88,7 +88,7 @@ namespace textgen
 
                 // Generate text
                 var textGenerator = new LlamaTextGenerator(httpClient, openAIHost);
-                OutputResult outputResult = await textGenerator.GenerateTextAsync(model, prompt, systemPrompt, config, conversationLog, cancellationToken);
+                OutputResult outputResult = await textGenerator.GenerateTextAsync(model, prompt, system, config, conversationLog, cancellationToken);
 
                 // Output result in the desired format
                 string formattedOutput = outputResult.Format(format);

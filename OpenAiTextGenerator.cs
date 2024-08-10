@@ -17,15 +17,15 @@ namespace textgen
         public OpenAiTextGenerator(HttpClient httpClient, string apiHost) : base(httpClient, apiHost)
         {}
 
-        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string systemPrompt, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
+        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
         {
             OpenAiConfig config = (OpenAiConfig)conf;
 
             var history = new List<(string, string)>();
-            // Add system-prompt to messages
+            // Add system to messages
             var messages = new List<dynamic>
             {
-                new { role = "system", content = systemPrompt ?? "" }
+                new { role = "system", content = system ?? "" }
             };
 
             // Add conversation history to messages
@@ -77,7 +77,7 @@ namespace textgen
                 Host = _apiHost,
                 Model = model,
                 Config = config,
-                SystemPrompt = systemPrompt,
+                System = system,
                 History = history,
                 Prompt = prompt.Trim(),
                 Completion = result.choices[0].message.content.ToString().Trim()

@@ -17,7 +17,7 @@ namespace textgen
         public LlamaTextGenerator(HttpClient httpClient, string apiHost) : base(httpClient, apiHost)
         { }
 
-        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string systemPrompt, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
+        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
         {
             LlamaConfig config = conf as LlamaConfig;
 
@@ -30,9 +30,9 @@ namespace textgen
             StringBuilder sb = new StringBuilder();
             var history = new List<(string, string)>();
 
-            // Add system-prompt to request prompt
-            if (!string.IsNullOrEmpty(systemPrompt))
-                sb.Append($"{systemPrompt}\n\n");
+            // Add system to request prompt
+            if (!string.IsNullOrEmpty(system))
+                sb.Append($"{system}\n\n");
 
             // Add conversation history to request prompt
             foreach (var entry in conversationLog.History)
@@ -98,7 +98,7 @@ namespace textgen
                 Host = _apiHost,
                 Model = model,
                 Config = config,
-                SystemPrompt = systemPrompt,
+                System = system,
                 History = history,
                 Prompt = prompt.Trim(),
                 Completion = result.content.ToString().Trim()
