@@ -62,7 +62,30 @@ namespace textgen
 
         public IConfig LoadFromText(string textContent)
         {
-            throw new NotSupportedException();
+            var config = Create();
+            var lines = textContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+            foreach (var line in lines)
+            {
+                var configLine = line.Split(new[] { '=' }, 2);
+                if (configLine.Length == 2)
+                {
+                    var key = configLine[0].Trim();
+                    var value = configLine[1].Trim();
+
+                    switch (key)
+                    {
+                        case "max_tokens": config.MaxTokens = int.Parse(value); break;
+                        case "seed": config.Seed = int.Parse(value); break;
+                        case "temperature": config.Temperature = double.Parse(value); break;
+                        case "top_p": config.TopP = double.Parse(value); break;
+                        case "username": config.Username = value; break;
+                        case "assistant_name": config.AssistantName = value; break;
+                    }
+                }
+            }
+
+            return config;
         }
     }
 }
