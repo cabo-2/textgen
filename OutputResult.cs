@@ -105,25 +105,50 @@ namespace textgen
                 }
                 else if (line.StartsWith("@system"))
                 {
-                    result.System = lines[++i];
+                    StringBuilder systemText = new StringBuilder();
+                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
+                    {
+                        systemText.AppendLine(lines[++i]);
+                    }
+                    result.System = systemText.ToString().Trim();
                 }
                 else if (line.StartsWith("@history-prompt"))
                 {
                     var index = int.Parse(line.Split('_')[1]);
-                    prompts[index] = lines[++i];
+                    StringBuilder promptText = new StringBuilder();
+                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
+                    {
+                        promptText.AppendLine(lines[++i]);
+                    }
+                    prompts[index] = promptText.ToString().Trim();
                 }
                 else if (line.StartsWith("@history-completion"))
                 {
                     var index = int.Parse(line.Split('_')[1]);
-                    completions[index] = lines[++i];
+                    StringBuilder completionText = new StringBuilder();
+                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
+                    {
+                        completionText.AppendLine(lines[++i]);
+                    }
+                    completions[index] = completionText.ToString().Trim();
                 }
                 else if (line.StartsWith("@prompt"))
                 {
-                    result.Prompt = lines[++i];
+                    StringBuilder promptText = new StringBuilder();
+                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
+                    {
+                        promptText.AppendLine(lines[++i]);
+                    }
+                    result.Prompt = promptText.ToString().Trim();
                 }
                 else if (line.StartsWith("@completion"))
                 {
-                    result.Completion = lines[++i];
+                    StringBuilder completionText = new StringBuilder();
+                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
+                    {
+                        completionText.AppendLine(lines[++i]);
+                    }
+                    result.Completion = completionText.ToString().Trim();
                 }
             }
 
