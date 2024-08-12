@@ -41,6 +41,7 @@ namespace textgen
             formatOption.DefaultValue = "text";
             formatOption.Accepts().Values("text", "json");
             var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
+            var outputDirectoryOption = app.Option("-O|--output-dir <DIR_PATH>", "Directory to save output file.", CommandOptionType.SingleValue);
             var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (JSON).", CommandOptionType.SingleValue);
             configOption.Accepts().ExistingFile();
             var conversationLogOption = app.Option("-l|--conversation-log <FNAME>", "File to read and maintain conversation logs.", CommandOptionType.SingleValue);
@@ -58,6 +59,7 @@ namespace textgen
                 string systemFile = systemFileOption.Value();
                 string format = formatOption.Value();
                 string outputFile = outputOption.Value();
+                string outputDirectory = outputDirectoryOption.Value();
                 string configFile = configOption.Value();
                 string conversationLogFile = conversationLogOption.Value();
 
@@ -98,6 +100,21 @@ namespace textgen
                 {
                     await File.WriteAllTextAsync(outputFile, formattedOutput, cancellationToken);
                 }
+                else if (!string.IsNullOrEmpty(outputDirectory))
+                {
+                    // Ensure the directory exists
+                    Directory.CreateDirectory(outputDirectory);
+
+                    // Create the file name
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+                    string fileExtension = format == "json" ? "json" : "txt";
+                    string fileName = $"textgen_log_{timestamp}.{fileExtension}";
+                    string fullPath = Path.Combine(outputDirectory, fileName);
+
+                    // Write the formatted output to the file
+                    await File.WriteAllTextAsync(fullPath, formattedOutput, cancellationToken);
+                }
+
                 // Always output to console
                 Console.WriteLine(outputResult.Completion);
 
