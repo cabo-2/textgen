@@ -119,20 +119,11 @@ namespace textgen
                     return 1;
                 }
 
-                StructuredPrompt structuredPrompt = new StructuredPrompt(prompt);
-                OutputResult outputResult;
-                if (structuredPrompt.IsValidStructuredPrompt)
+                PromptSet promptSet = PromptSet.Create(prompt);
+                OutputResult outputResult = conversationLog.DeepClone();
+                foreach(var input in promptSet.Prompts)
                 {
-                    for (int i = 0; i < structuredPrompt.Prompts.Count - 1; i++)
-                    {
-                        conversationLog = await textGenerator.GenerateTextAsync(model, structuredPrompt.Prompts[i], system, config, conversationLog, cancellationToken);
-                    }                    
-                    outputResult = await textGenerator.GenerateTextAsync(model, structuredPrompt.Prompts.Last(), system, config, conversationLog, cancellationToken);
-                }
-                else
-                {
-                    // Use the existing logic for plain text prompts
-                    outputResult = await textGenerator.GenerateTextAsync(model, prompt, system, config, conversationLog, cancellationToken);
+                    outputResult = await textGenerator.GenerateTextAsync(model, input, system, config, outputResult, cancellationToken);
                 }
 
                 // Output result in the desired format
