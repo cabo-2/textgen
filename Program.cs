@@ -46,6 +46,8 @@ namespace textgen
             configOption.Accepts().ExistingFile();
             var conversationLogOption = app.Option("-l|--conversation-log <FNAME>", "File to read and maintain conversation logs.", CommandOptionType.SingleValue);
             conversationLogOption.Accepts().ExistingFile();
+            var conversationLogDirectoryOption = app.Option("-L|--conversation-log-dir <DIR_PATH>", "Directory to read conversation logs from.", CommandOptionType.SingleValue);
+            conversationLogDirectoryOption.Accepts().ExistingDirectory();
 
             app.HelpOption("-h|--help");
             app.VersionOption("-v|--version", "1.0.0");
@@ -62,6 +64,14 @@ namespace textgen
                 string outputDirectory = outputDirectoryOption.Value();
                 string configFile = configOption.Value();
                 string conversationLogFile = conversationLogOption.Value();
+                string conversationLogDirectory = conversationLogDirectoryOption.Value();
+
+                // Check for conflicting options
+                if (!string.IsNullOrEmpty(conversationLogDirectory) && (!string.IsNullOrEmpty(outputFile) || !string.IsNullOrEmpty(outputDirectory)))
+                {
+                    Console.WriteLine("Error: Cannot specify both -L with either -o or -O options.");
+                    return 1;
+                }
 
                 // Determine the text generator and configuration to use
                 var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient);
@@ -82,8 +92,25 @@ namespace textgen
                     system = await File.ReadAllTextAsync(systemFile, cancellationToken);
                 }
 
-                // Load conversation history from log file
-                var conversationLog = string.IsNullOrEmpty(conversationLogFile) ? new OutputResult() : await OutputResult.LoadFromFileAsync(conversationLogFile, defaultConfig, cancellationToken);
+                OutputResult conversationLog = new OutputResult();
+
+                // Load conversation history either from a directory or a specific file
+                if (!string.IsNullOrEmpty(conversationLogDirectory))
+                {
+                    var files = Directory.GetFiles(conversationLogDirectory, "textgen_log_*.*")
+                        .OrderByDescending(f => f)
+                        .ToList();
+
+                    if (files.Count > 0)
+                    {
+                        string latestFile = files[0];
+                        conversationLog = await OutputResult.LoadFromFileAsync(latestFile, defaultConfig, cancellationToken);
+                    }
+                }
+                else if (!string.IsNullOrEmpty(conversationLogFile))
+                {
+                    conversationLog = await OutputResult.LoadFromFileAsync(conversationLogFile, defaultConfig, cancellationToken);
+                }
 
                 // Validate inputs
                 if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
