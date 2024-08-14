@@ -1,7 +1,22 @@
 #!/bin/bash
 
+usage() {
+  echo "Usage: textgen_dir.sh [options]"
+  echo ""
+  echo "Options:"
+  echo "  -m|--model <MODEL>                Specify the model to use (gpt-3.5-turbo, gpt-4)."
+  echo "  -i|--input-prompt-dir <DIR_PATH>  Input message from directory."
+  echo "  -o|--output-dir <DIR_PATH>        Directory to save output file."
+  echo "  -s|--system-file <FNAME>          System prompt from a file."
+  echo "  -f|--format <FORMAT>              Output format (text, json)"
+  echo "                                    Allowed values are: text, json."
+  echo "                                    Default value is: text."
+  echo "  -c|--config <FNAME>               Parameter settings file (JSON)."
+  echo "  -h|--help                         Show help information."
+}
+
 # Define the options for getopt
-options="i:o:hmv:ls:S:f:c:"
+options="i:o:m:s:f:c:h"
 
 # Parse the command-line arguments
 while getopts "$options" opt; do
@@ -15,18 +30,7 @@ while getopts "$options" opt; do
     m)
       model="$OPTARG"
       ;;
-    v)
-      textgen --version
-      exit 0
-      ;;
-    l)
-      textgen --list-model
-      exit 0
-      ;;
     s)
-      system_prompt="$OPTARG"
-      ;;
-    S)
       system_file="$OPTARG"
       ;;
     f)
@@ -36,7 +40,7 @@ while getopts "$options" opt; do
       config="$OPTARG"
       ;;
     h)
-      textgen --help
+      usage
       exit 0
       ;;
     \?)
@@ -50,9 +54,10 @@ while getopts "$options" opt; do
   esac
 done
 
-# Check if both input and output directories are specified
-if [[ -z "$input_dir" || -z "$output_dir" ]]; then
-  echo "Error: Both input and output directories must be specified."
+# Check for mandatory options
+if [[ -z "$input_dir" || -z "$output_dir" || -z "$model" || -z "$system_file" ]]; then
+  echo "Error: Options -m, -i, -o, and -s are required."
+  usage
   exit 1
 fi
 
@@ -68,10 +73,6 @@ if [[ "$input_dir_full" == "$output_dir_full" ]]; then
   exit 1
 fi
 
-# Get the remaining arguments
-shift $((OPTIND - 1))
-args=("$@")
-
 # Find files in the input directory
 find "$input_dir_full" -maxdepth 1 -type f -print0 | while IFS= read -r -d $'\0' file; do
   # Get the full path of the file
@@ -84,11 +85,9 @@ find "$input_dir_full" -maxdepth 1 -type f -print0 | while IFS= read -r -d $'\0'
   output_file="$output_dir_full/$filename"
 
   # Execute textgen command with the full paths of input and output files
-  textgen -P "$file_full" -o "$output_file" \
-    ${model:+-m "$model"} \
-    ${system_prompt:+-s "$system_prompt"} \
-    ${system_file:+-S "$system_file"} \
-    ${format:+-f "$format"} \
-    ${config:+-c "$config"} \
-    "${args[@]}"
+  textgen -P "\"$file_full\"" -o "\"$output_file\"" \
+    -m "\"$model\"" \
+    -S \""$system_file"\" \
+    ${format:+-f "\"$format\""} \
+    ${config:+-c "\"$config\""}
 done
