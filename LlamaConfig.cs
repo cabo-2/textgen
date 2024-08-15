@@ -20,7 +20,7 @@ namespace textgen
             PresencePenalty = 0.0,
             FrequencyPenalty = 0.0,
             RepeatPenalty = 1.1,
-            Stream = false,
+            Stream = true,
             CachePrompt = true,
             Username = "user",
             AssistantName = "assistant"

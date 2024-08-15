@@ -21,12 +21,6 @@ namespace textgen
         {
             LlamaConfig config = conf as LlamaConfig;
 
-            if (config.Stream)
-            {
-                Console.Error.WriteLine("Warning: stream is set to true, but it is not supported. Setting to false.");
-                config.Stream = false;
-            }
-
             StringBuilder sb = new StringBuilder();
             var history = new List<(string, string)>();
 
@@ -76,33 +70,76 @@ namespace textgen
                 cache_prompt = config.CachePrompt
             };
 
-            Console.Write(sb.ToString());
-
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
             var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PostAsync(_apiHost, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
-            dynamic result = JsonConvert.DeserializeObject(jsonResponse);
-
-            if (result.stop != "true")
+            if (config.Stream)
             {
-                Console.Error.WriteLine("Warning: stop field is false.");
+                return await ReadStreamedResponseAsync(response, config, system, model, prompt, history);
             }
-
-            return new OutputResult
+            else
             {
-                Date = DateTime.UtcNow.ToString("o"),
-                Host = _apiHost,
-                Model = model,
-                Config = config,
-                System = system,
-                History = history,
-                Prompt = prompt.Trim(),
-                Completion = result.content.ToString().Trim()
-            };
+                var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
+                dynamic result = JsonConvert.DeserializeObject(jsonResponse);
+
+                if (result.stop != "true")
+                {
+                    Console.Error.WriteLine("Warning: stop field is false.");
+                }
+
+                return new OutputResult
+                {
+                    Date = DateTime.UtcNow.ToString("o"),
+                    Host = _apiHost,
+                    Model = model,
+                    Config = config,
+                    System = system,
+                    History = history,
+                    Prompt = prompt.Trim(),
+                    Completion = result.content.ToString().Trim()
+                };
+            }
+        }
+
+        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, LlamaConfig config, string system, string model, string prompt, List<(string, string)> history)
+        {
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var reader = new StreamReader(stream))
+            {
+                var completionText = new StringBuilder();
+                string line;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (line.StartsWith("data:"))
+                    {
+                        line = line.Substring("data:".Length).Trim();
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            dynamic result = JsonConvert.DeserializeObject(line);
+                            string content = result.content;
+                            if (!string.IsNullOrEmpty(content))
+                            {
+                                completionText.Append(content);
+                            }
+                        }
+                    }
+                }
+
+                return new OutputResult
+                {
+                    Date = DateTime.UtcNow.ToString("o"),
+                    Host = _apiHost,
+                    Model = model,
+                    Config = config,
+                    System = system,
+                    History = history,
+                    Prompt = prompt.Trim(),
+                    Completion = completionText.ToString().Trim()
+                };
+            }
         }
 
         public override IConfig CreateDefaultConfig() => LlamaConfig.Create();

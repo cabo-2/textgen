@@ -15,6 +15,7 @@ namespace textgen
             Seed = 0,
             Temperature = 0.7,
             TopP = 1,
+            Stream = true,
             Username = "user",
             AssistantName = "assistant"
         };
@@ -23,6 +24,7 @@ namespace textgen
         public int Seed { get; set; }
         public double Temperature { get; set; }
         public double TopP { get; set; }
+        public bool Stream { get; set; }
         public string Username { get; set; }
         public string AssistantName { get; set; }
 
@@ -43,6 +45,7 @@ namespace textgen
                 Seed = config.seed ?? value.Seed,
                 Temperature = config.temperature ?? value.Temperature,
                 TopP = config.top_p ?? value.TopP,
+                Stream = config.stream ?? value.Stream,
                 Username = config.username ?? value.Username,
                 AssistantName = config.assistant_name ?? value.AssistantName
             };
@@ -55,6 +58,7 @@ namespace textgen
             sb.Append($"seed={Seed}\n");
             sb.Append($"temperature={Temperature}\n");
             sb.Append($"top_p={TopP}\n");
+            sb.Append($"stream={Stream.ToString().ToLower()}\n");
             sb.Append($"username={Username}\n");
             sb.Append($"assistant_name={AssistantName}\n");
             return sb.ToString();
@@ -79,6 +83,7 @@ namespace textgen
                         case "seed": config.Seed = int.Parse(value); break;
                         case "temperature": config.Temperature = double.Parse(value); break;
                         case "top_p": config.TopP = double.Parse(value); break;
+                        case "stream": config.Stream = bool.Parse(value); break;
                         case "username": config.Username = value; break;
                         case "assistant_name": config.AssistantName = value; break;
                     }

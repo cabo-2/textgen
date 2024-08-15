@@ -59,7 +59,8 @@ namespace textgen
                 max_tokens = config.MaxTokens,
                 seed = config.Seed,
                 temperature = config.Temperature,
-                top_p = config.TopP
+                top_p = config.TopP,
+                stream = config.Stream // Include stream configuration
             };
 
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
@@ -68,20 +69,65 @@ namespace textgen
             var response = await _httpClient.PostAsync(_apiHost, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
-            dynamic result = JsonConvert.DeserializeObject(jsonResponse);
-
-            return new OutputResult
+            if (config.Stream)
             {
-                Date = DateTime.UtcNow.ToString("o"),
-                Host = _apiHost,
-                Model = model,
-                Config = config,
-                System = system,
-                History = history,
-                Prompt = prompt.Trim(),
-                Completion = result.choices[0].message.content.ToString().Trim()
-            };
+                return await ReadStreamedResponseAsync(response, config, system, model, prompt, history);
+            }
+            else
+            {
+                var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
+                dynamic result = JsonConvert.DeserializeObject(jsonResponse);
+
+                return new OutputResult
+                {
+                    Date = DateTime.UtcNow.ToString("o"),
+                    Host = _apiHost,
+                    Model = model,
+                    Config = config,
+                    System = system,
+                    History = history,
+                    Prompt = prompt.Trim(),
+                    Completion = result.choices[0].message.content.ToString().Trim()
+                };
+            }
+        }
+
+        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, OpenAiConfig config, string system, string model, string prompt, List<(string, string)> history)
+        {
+            using (var stream = await response.Content.ReadAsStreamAsync())
+            using (var reader = new StreamReader(stream))
+            {
+                var completionText = new StringBuilder();
+                string line;
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (line.StartsWith("data:"))
+                    {                        
+                        line = line.Substring("data:".Length).Trim();
+                        if (!string.IsNullOrEmpty(line))
+                        {
+                            dynamic result = JsonConvert.DeserializeObject(line);
+                            string content = result.choices[0].delta?.content;
+                            if (!string.IsNullOrEmpty(content))
+                            {
+                                completionText.Append(content);                                
+                            }
+                        }
+                    }
+                }
+
+                return new OutputResult
+                {
+                    Date = DateTime.UtcNow.ToString("o"),
+                    Host = _apiHost,
+                    Model = model,
+                    Config = config,
+                    System = system,
+                    History = history,
+                    Prompt = prompt.Trim(),
+                    Completion = completionText.ToString().Trim()
+                };
+            }
         }
 
         public override IConfig CreateDefaultConfig() => OpenAiConfig.Create();
