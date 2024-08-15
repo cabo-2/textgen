@@ -84,6 +84,12 @@ find "$input_dir_full" -maxdepth 1 -type f -print0 | while IFS= read -r -d $'\0'
   # Create the full path of the output file
   output_file="$output_dir_full/$filename"
 
+  # Check if the output file already exists
+  if [[ -f "$output_file" ]]; then
+    echo "Skipping $output_file as it already exists."
+    continue
+  fi
+
   # Execute textgen command with the full paths of input and output files
   textgen -P "\"$file_full\"" -o "\"$output_file\"" \
     -m "\"$model\"" \
