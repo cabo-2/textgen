@@ -85,11 +85,6 @@ namespace textgen
                 var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
                 dynamic result = JsonConvert.DeserializeObject(jsonResponse);
 
-                if (result.stop != "true")
-                {
-                    Console.Error.WriteLine("Warning: stop field is false.");
-                }
-
                 return new OutputResult
                 {
                     Date = DateTime.UtcNow.ToString("o"),
@@ -110,7 +105,9 @@ namespace textgen
             using (var reader = new StreamReader(stream))
             {
                 var completionText = new StringBuilder();
+                string stopSequence = $"{config.Username}:";
                 string line;
+
                 while ((line = await reader.ReadLineAsync()) != null)
                 {
                     if (line.StartsWith("data:"))
@@ -120,9 +117,19 @@ namespace textgen
                         {
                             dynamic result = JsonConvert.DeserializeObject(line);
                             string content = result.content;
+
                             if (!string.IsNullOrEmpty(content))
                             {
                                 completionText.Append(content);
+
+                                // Check if stop sequence is found
+                                int stopIndex = completionText.ToString().IndexOf(stopSequence, StringComparison.OrdinalIgnoreCase);
+                                if (stopIndex >= 0)
+                                {
+                                    // If found, remove everything after the stop sequence
+                                    completionText.Length = stopIndex;
+                                    break;
+                                }
                             }
                         }
                     }
