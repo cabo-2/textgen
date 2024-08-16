@@ -91,9 +91,9 @@ find "$input_dir_full" -maxdepth 1 -type f -print0 | while IFS= read -r -d $'\0'
   fi
 
   # Execute textgen command with the full paths of input and output files
-  textgen -P "\"$file_full\"" -o "\"$output_file\"" \
-    -m "\"$model\"" \
-    -S \""$system_file"\" \
-    ${format:+-f "\"$format\""} \
-    ${config:+-c "\"$config\""}
+  textgen -P "$file_full" -o "$output_file" \
+    -m "$model" \
+    -S "$system_file" \
+    ${format:+-f "$format"} \
+    ${config:+-c "$config"}
 done
