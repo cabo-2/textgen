@@ -100,11 +100,11 @@ namespace textgen
                 var completionText = new StringBuilder();
                 string line;
                 while ((line = await reader.ReadLineAsync()) != null)
-                {
+                {                    
                     if (line.StartsWith("data:"))
                     {                        
-                        line = line.Substring("data:".Length).Trim();
-                        if (!string.IsNullOrEmpty(line))
+                        line = line.Substring("data:".Length).Trim();                        
+                        if (!string.IsNullOrWhiteSpace(line) && line != "[DONE]")
                         {
                             dynamic result = JsonConvert.DeserializeObject(line);
                             string content = result.choices[0].delta?.content;
