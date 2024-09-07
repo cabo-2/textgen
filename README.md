@@ -24,7 +24,7 @@ TextGen is a console-based client for text generation using a server implementin
 1. **Clone the repository**
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/cabo-2/textgen
 cd textgen
 ```
 
@@ -82,7 +82,7 @@ export OPENAI_API_HOST="http://localhost:8081/completion"
 export OPENAI_API_KEY="your_api_key"
 ```
 
-*For llama.cpp-server, API keys are not required.*
+- *For llama.cpp server, API keys are not required.*
 
 
 ### API Endpoints
@@ -96,8 +96,8 @@ Example usage:
 dotnet run -- -m gemma-27b -p "What is the capital of France?" -o ~/output.txt
 ```
 
-*When using llama.cpp, a single model loaded by llama-server is executed regardless of the specified model name.*
-*The "/completions" endpoint behaves similarly to the standard web UI of llama-server. For new models, especially those with chat-template specifications, it is recommended to use "/v1/chat/completions".*
+- *When using llama.cpp, a single model loaded by llama-server is executed regardless of the specified model name.*
+- *The "/completions" endpoint behaves similarly to the standard web UI of llama-server. For new models, especially those with chat-template specifications, it is recommended to use "/v1/chat/completions".*
 
 
 Example config:
@@ -150,6 +150,42 @@ assistant_name=assistant
 ## Output
 
 The completion results can be saved to a specified file or directory. The application supports both plain text and JSON formats for easy integration and analysis.
+
+Example output:
+```txt
+@date
+2024-09-07T22:39:59.6197637Z
+
+@host
+http://localhost:8081/completion
+
+@model
+gemma-27b
+
+@config
+n_predict=1200
+seed=1337
+temperature=0.7
+top_k=50
+top_p=0.9
+min_p=0.1
+presence_penalty=0
+frequency_penalty=0
+repeat_penalty=1.1
+stream=true
+cache_prompt=true
+username=user
+assistant_name=assistant
+
+@system
+
+
+@prompt
+What is the capital of France?
+
+@completion
+The capital of France is **Paris**. 🇫🇷
+```
 
 
 ## License
