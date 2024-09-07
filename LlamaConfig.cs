@@ -47,26 +47,34 @@ namespace textgen
                 return Create(); // Use default values
             }
 
-            var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
-            var value = Create();
-            dynamic config = JsonConvert.DeserializeObject(configContent);
-
-            return new LlamaConfig
+            if (Path.GetExtension(configFile) != ".json")
             {
-                NPredict = config.n_predict ?? value.NPredict,
-                Seed = config.seed ?? value.Seed,
-                Temperature = config.temperature ?? value.Temperature,
-                TopK = config.top_k ?? value.TopK,
-                TopP = config.top_p ?? value.TopP,
-                MinP = config.min_p ?? value.MinP,
-                PresencePenalty = config.presence_penalty ?? value.PresencePenalty,
-                FrequencyPenalty = config.frequency_penalty ?? value.FrequencyPenalty,
-                RepeatPenalty = config.repeat_penalty ?? value.RepeatPenalty,
-                Stream = config.stream ?? value.Stream,
-                CachePrompt = config.cache_prompt ?? value.CachePrompt,
-                Username = config.username ?? value.Username,
-                AssistantName = config.assistant_name ?? value.AssistantName
-            };
+                string configText = await File.ReadAllTextAsync(configFile, cancellationToken);
+                return LoadFromText(configText);
+            }
+            else
+            {
+                var configJson = await File.ReadAllTextAsync(configFile, cancellationToken);
+                var value = Create();
+                dynamic config = JsonConvert.DeserializeObject(configJson);
+
+                return new LlamaConfig
+                {
+                    NPredict = config.n_predict ?? value.NPredict,
+                    Seed = config.seed ?? value.Seed,
+                    Temperature = config.temperature ?? value.Temperature,
+                    TopK = config.top_k ?? value.TopK,
+                    TopP = config.top_p ?? value.TopP,
+                    MinP = config.min_p ?? value.MinP,
+                    PresencePenalty = config.presence_penalty ?? value.PresencePenalty,
+                    FrequencyPenalty = config.frequency_penalty ?? value.FrequencyPenalty,
+                    RepeatPenalty = config.repeat_penalty ?? value.RepeatPenalty,
+                    Stream = config.stream ?? value.Stream,
+                    CachePrompt = config.cache_prompt ?? value.CachePrompt,
+                    Username = config.username ?? value.Username,
+                    AssistantName = config.assistant_name ?? value.AssistantName
+                };
+            }
         }
 
         public string FormatConfig()

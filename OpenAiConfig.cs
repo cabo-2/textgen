@@ -35,20 +35,28 @@ namespace textgen
                 return Create(); // Use default values
             }
 
-            var configContent = await File.ReadAllTextAsync(configFile, cancellationToken);
-            var value = Create();
-            dynamic config = JsonConvert.DeserializeObject(configContent);
-
-            return new OpenAiConfig
+            if (Path.GetExtension(configFile) != ".json")
             {
-                MaxTokens = config.max_tokens ?? value.MaxTokens,
-                Seed = config.seed ?? value.Seed,
-                Temperature = config.temperature ?? value.Temperature,
-                TopP = config.top_p ?? value.TopP,
-                Stream = config.stream ?? value.Stream,
-                Username = config.username ?? value.Username,
-                AssistantName = config.assistant_name ?? value.AssistantName
-            };
+                string configText = await File.ReadAllTextAsync(configFile, cancellationToken);
+                return LoadFromText(configText);
+            }
+            else
+            {
+                var configJson = await File.ReadAllTextAsync(configFile, cancellationToken);
+                var value = Create();
+                dynamic config = JsonConvert.DeserializeObject(configJson);
+
+                return new OpenAiConfig
+                {
+                    MaxTokens = config.max_tokens ?? value.MaxTokens,
+                    Seed = config.seed ?? value.Seed,
+                    Temperature = config.temperature ?? value.Temperature,
+                    TopP = config.top_p ?? value.TopP,
+                    Stream = config.stream ?? value.Stream,
+                    Username = config.username ?? value.Username,
+                    AssistantName = config.assistant_name ?? value.AssistantName
+                };
+            }
         }
 
         public string FormatConfig()

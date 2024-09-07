@@ -42,7 +42,7 @@ namespace textgen
             formatOption.Accepts().Values("text", "json");
             var outputOption = app.Option("-o|--output <FILE_PATH>", "Output file path (default is standard output).", CommandOptionType.SingleValue);
             var outputDirectoryOption = app.Option("-O|--output-dir <DIR_PATH>", "Directory to save output file.", CommandOptionType.SingleValue);
-            var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (JSON).", CommandOptionType.SingleValue);
+            var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (text, json).", CommandOptionType.SingleValue);
             configOption.Accepts().ExistingFile();
             var conversationLogOption = app.Option("-l|--conversation-log <FNAME>", "File to read and maintain conversation logs.", CommandOptionType.SingleValue);
             conversationLogOption.Accepts().ExistingFile();

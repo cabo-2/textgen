@@ -11,7 +11,7 @@ usage() {
   echo "  -f|--format <FORMAT>              Output format (text, json)"
   echo "                                    Allowed values are: text, json."
   echo "                                    Default value is: text."
-  echo "  -c|--config <FNAME>               Parameter settings file (JSON)."
+  echo "  -c|--config <FNAME>               Parameter settings file (text, json)."
   echo "  -h|--help                         Show help information."
 }
 
