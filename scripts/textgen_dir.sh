@@ -4,7 +4,7 @@ usage() {
   echo "Usage: textgen_dir.sh [options]"
   echo ""
   echo "Options:"
-  echo "  -m|--model <MODEL>                Specify the model to use (gpt-3.5-turbo, gpt-4)."
+  echo "  -m|--model <MODEL>                Specify the model to use (gpt-4o, gpt-4o-mini)."
   echo "  -i|--input-prompt-dir <DIR_PATH>  Input message from directory."
   echo "  -o|--output-dir <DIR_PATH>        Directory to save output file."
   echo "  -s|--system-file <FNAME>          System prompt from a file."

@@ -32,7 +32,7 @@ namespace textgen
             };
 
             // Command-line arguments
-            var modelOption = app.Option("-m|--model <MODEL>", "Specify the model to use (gpt-3.5-turbo, gpt-4).", CommandOptionType.SingleValue);
+            var modelOption = app.Option("-m|--model <MODEL>", "Specify the model to use (gpt-4o, gpt-4o-mini).", CommandOptionType.SingleValue);
             var promptOption = app.Option("-p|--prompt <PROMPT>", "Input message directly.", CommandOptionType.SingleValue);
             var promptFileOption = app.Option("-P|--prompt-file <FNAME>", "Input message from a file.", CommandOptionType.SingleValue);
             var systemOption = app.Option("-s|--system <SYSTEM_PROMPT>", "System prompt directly.", CommandOptionType.SingleValue);
