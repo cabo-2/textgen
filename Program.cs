@@ -124,6 +124,8 @@ namespace textgen
                 foreach(var input in promptSet.Prompts)
                 {
                     outputResult = await textGenerator.GenerateTextAsync(model, input, system, config, outputResult, cancellationToken);
+                    // Always output to console
+                    Console.WriteLine(outputResult.Completion);
                 }
 
                 // Output result in the desired format
@@ -146,9 +148,6 @@ namespace textgen
                     // Write the formatted output to the file
                     await File.WriteAllTextAsync(fullPath, formattedOutput, cancellationToken);
                 }
-
-                // Always output to console
-                Console.WriteLine(outputResult.Completion);
 
                 return 0;
             });
