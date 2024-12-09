@@ -64,8 +64,24 @@ namespace textgen
                 // If query option is specified, handle it and exit
                 if (queryOption.HasValue())
                 {
-                    var handler = new ModelQueryHandler(openAIHost, httpClient);
-                    return await handler.ExecuteAsync();
+                    var provider = TextGeneratorFactory.CreateModelProvider(openAIHost, httpClient, apiKey);
+                    if (provider == null)
+                    {
+                        Console.WriteLine("Unsupported endpoint.");
+                        return 0;
+                    }
+
+                    var models = await provider.GetModelsAsync();
+                    if (models == null)
+                        return 1;
+
+                    if (models.Count > 0)
+                        foreach (var m in models)
+                            Console.WriteLine(m);
+                    else
+                        Console.WriteLine("No models found.");
+
+                    return 0;
                 }
 
                 // Existing options processing

@@ -30,5 +30,20 @@ namespace textgen
                     throw new NotSupportedException("apiHost");
             }
         }
+
+        public static IModelProvider CreateModelProvider(string apiHost, HttpClient httpClient, string apiKey = null)
+        {
+            ApiEndpoint endpoint = apiHost.GetApiEndpoint();
+
+            switch (endpoint)
+            {
+                case ApiEndpoint.OpenAi:
+                    return new OpenAIModelProvider(httpClient, apiHost);
+                case ApiEndpoint.Gemini:
+                    return new GeminiModelProvider(httpClient, apiHost, apiKey);
+                default:
+                    return null;
+            }
+        }
     }
 }
