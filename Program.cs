@@ -48,12 +48,21 @@ namespace textgen
             conversationLogOption.Accepts().ExistingFile();
             var conversationLogDirectoryOption = app.Option("-L|--conversation-log-dir <DIR_PATH>", "Directory to read conversation logs from.", CommandOptionType.SingleValue);
             conversationLogDirectoryOption.Accepts().ExistingDirectory();
+            var queryOption = app.Option("-q|--query", "Query and list available model names.", CommandOptionType.NoValue);
 
             app.HelpOption("-h|--help");
             app.VersionOption("-v|--version", "1.0.0");
 
             app.OnExecuteAsync(async (cancellationToken) =>
             {
+                // If query option is specified, handle it and exit
+                if (queryOption.HasValue())
+                {
+                    var handler = new ModelQueryHandler(openAIHost, httpClient);
+                    return await handler.ExecuteAsync();
+                }
+
+                // Existing options processing
                 string model = modelOption.Value();
                 string prompt = promptOption.Value();
                 string promptFile = promptFileOption.Value();
@@ -121,7 +130,7 @@ namespace textgen
 
                 PromptSet promptSet = PromptSet.Create(prompt);
                 OutputResult outputResult = conversationLog.DeepClone();
-                foreach(var input in promptSet.Prompts)
+                foreach (var input in promptSet.Prompts)
                 {
                     outputResult = await textGenerator.GenerateTextAsync(model, input, system, config, outputResult, cancellationToken);
                     // Always output to console
