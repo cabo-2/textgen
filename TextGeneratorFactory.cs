@@ -20,14 +20,14 @@ namespace textgen
                     if (string.IsNullOrEmpty(apiKey))
                     {
                         Console.Error.WriteLine("Error: API key is required for Gemini API.");
-                        throw new ArgumentException("apiKey");
+                        return null;
                     }
                     return new GeminiTextGenerator(httpClient, apiHost, apiKey);
 
                 default:
                     Console.Error.WriteLine("Error: Unsupported API endpoint specified.");
                     Console.Error.WriteLine($"The specified endpoint is: {apiHost}");
-                    throw new NotSupportedException("apiHost");
+                    return null;
             }
         }
 

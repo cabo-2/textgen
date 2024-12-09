@@ -106,6 +106,9 @@ namespace textgen
 
                 // Determine the text generator and configuration to use
                 var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient, apiKey);
+                if (textGenerator == null)
+                    return 1;
+                    
                 var defaultConfig = textGenerator.CreateDefaultConfig();
 
                 // Load parameters from config file if specified
