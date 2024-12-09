@@ -16,4 +16,27 @@ namespace textgen
             return JsonSerializer.Deserialize<T>(json);
         }
     }
+
+    public static class StringExtensions
+    {
+        public static ApiEndpoint GetApiEndpoint(this string apiHost)
+        {
+            if (apiHost.EndsWith("/completion"))
+            {
+                return ApiEndpoint.Llama;
+            }
+            if (apiHost.EndsWith("/v1/chat/completions"))
+            {
+                return ApiEndpoint.OpenAi;
+            }
+            return ApiEndpoint.Unsupported;
+        }
+    }
+
+    public enum ApiEndpoint
+    {
+        Llama,
+        OpenAi,
+        Unsupported
+    }
 }

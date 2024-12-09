@@ -6,7 +6,7 @@ namespace textgen
     {
         public static TextGenerator CreateGenerator(string apiHost, HttpClient httpClient)
         {
-            ApiEndpoint endpoint = GetApiEndpoint(apiHost);
+            ApiEndpoint endpoint = apiHost.GetApiEndpoint();
 
             switch (endpoint)
             {
@@ -22,25 +22,5 @@ namespace textgen
                     throw new NotSupportedException("apiHost");
             }
         }
-
-        private static ApiEndpoint GetApiEndpoint(string apiHost)
-        {
-            if (apiHost.EndsWith("/completion"))
-            {
-                return ApiEndpoint.Llama;
-            }
-            if (apiHost.EndsWith("/v1/chat/completions"))
-            {
-                return ApiEndpoint.OpenAi;
-            }
-            return ApiEndpoint.Unsupported;
-        }
-    }
-
-    public enum ApiEndpoint
-    {
-        Llama,
-        OpenAi,
-        Unsupported
     }
 }

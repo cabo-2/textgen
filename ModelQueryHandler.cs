@@ -18,7 +18,7 @@ namespace textgen
 
         public async Task<int> ExecuteAsync()
         {
-            if (_apiHost.EndsWith("/v1/chat/completions"))
+            if (_apiHost.GetApiEndpoint() == ApiEndpoint.OpenAi)
             {
                 string baseUrl = GetBaseUrl(_apiHost);
                 if (baseUrl == null)
