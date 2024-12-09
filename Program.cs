@@ -16,11 +16,17 @@ namespace textgen
     {
         private static readonly HttpClient httpClient = new HttpClient();
         private static string openAIHost;
+        private static readonly string apiKey;
 
         static Program()
         {
             openAIHost = Environment.GetEnvironmentVariable("OPENAI_API_HOST") ?? "http://localhost:8081/completion";
-            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Environment.GetEnvironmentVariable("OPENAI_API_KEY"));
+            apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+            if (!string.IsNullOrEmpty(apiKey))
+            {
+                if (openAIHost.GetApiEndpoint() != ApiEndpoint.Gemini)
+                    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            }
         }
 
         static async Task<int> Main(string[] args)
@@ -83,7 +89,7 @@ namespace textgen
                 }
 
                 // Determine the text generator and configuration to use
-                var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient);
+                var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient, apiKey);
                 var defaultConfig = textGenerator.CreateDefaultConfig();
 
                 // Load parameters from config file if specified

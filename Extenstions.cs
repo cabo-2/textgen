@@ -29,6 +29,10 @@ namespace textgen
             {
                 return ApiEndpoint.OpenAi;
             }
+            if (apiHost == "https://generativelanguage.googleapis.com/v1beta/models")
+            {
+                return ApiEndpoint.Gemini;
+            }
             return ApiEndpoint.Unsupported;
         }
     }
@@ -37,6 +41,7 @@ namespace textgen
     {
         Llama,
         OpenAi,
+        Gemini,
         Unsupported
     }
 }

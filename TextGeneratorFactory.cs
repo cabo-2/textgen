@@ -4,7 +4,7 @@ namespace textgen
 {
     public static class TextGeneratorFactory
     {
-        public static TextGenerator CreateGenerator(string apiHost, HttpClient httpClient)
+        public static TextGenerator CreateGenerator(string apiHost, HttpClient httpClient, string apiKey = null)
         {
             ApiEndpoint endpoint = apiHost.GetApiEndpoint();
 
@@ -15,6 +15,14 @@ namespace textgen
 
                 case ApiEndpoint.OpenAi:
                     return new OpenAiTextGenerator(httpClient, apiHost);
+
+                case ApiEndpoint.Gemini:
+                    if (string.IsNullOrEmpty(apiKey))
+                    {
+                        Console.Error.WriteLine("Error: API key is required for Gemini API.");
+                        throw new ArgumentException("apiKey");
+                    }
+                    return new GeminiTextGenerator(httpClient, apiHost, apiKey);
 
                 default:
                     Console.Error.WriteLine("Error: Unsupported API endpoint specified.");
