@@ -67,6 +67,8 @@ Options
 
     -L|--conversation-log-dir <DIR_PATH>: Directory to read conversation logs.
 
+    -q|--query: Query and list available model names.
+
     -h|--help: Show help information.
 
     -v|--version: Display version information.
@@ -93,12 +95,14 @@ Use this endpoint for basic text completion tasks.
 
 Example usage:
 ```bash
+export OPENAI_API_HOST="http://localhost:8081/completion"
+export OPENAI_API_KEY="no-key"
+
 dotnet run -- -m gemma-27b -p "What is the capital of France?" -o ~/output.txt
 ```
 
 - *When using llama.cpp, a single model loaded by llama-server is executed regardless of the specified model name.*
-- *The "/completions" endpoint behaves similarly to the standard web UI of llama-server. For new models, especially those with chat-template specifications, it is recommended to use "/v1/chat/completions".*
-
+- *The "/completions" endpoint behaves similarly to the legacy web UI of llama-server. For new models, especially those with chat-template specifications, it is recommended to use "/v1/chat/completions".*
 
 Example config:
 ```txt
@@ -117,23 +121,21 @@ username=user
 assistant_name=assistant
 ```
 
-
 2. **/v1/chat/completions Endpoint**
 
 Utilize this endpoint for chat-based interactions.
 
-Chat models like gpt-4o can be accessed here.
+Chat models like gpt-4o-mini can be accessed here.
 
 Example usage:
 ```bash
 export OPENAI_API_HOST="https://api.openai.com/v1/chat/completions"
-export OPENAI_API_KEY="your_api_key"
+export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 
 dotnet run -- -m gpt-4o-mini -p "Show me a code snippet of a website's sticky header in CSS and JavaScript." -o ~/output.txt
 ```
 
 **Please handle API keys with utmost care!**
-
 
 Example config:
 ```txt
@@ -144,6 +146,29 @@ top_p=1
 stream=true
 username=user
 assistant_name=assistant
+```
+
+3. **/v1beta/models Endpoint (Gemini API)**
+
+Utilize this endpoint for accessing [Google's Gemini API](https://ai.google.dev/gemini-api/docs/text-generation).
+
+Example usage:
+```bash
+export OPENAI_API_HOST="https://generativelanguage.googleapis.com/v1beta/models"
+export OPENAI_API_KEY="YOUR_GEMINI_API_KEY"
+
+dotnet run -- -m gemini-1.5-flash -p "Write a story about a magic backpack." -o ~/output.txt
+```
+
+**Please handle API keys with utmost care!**
+
+Example config:
+```txt
+temperature=0.9
+top_p=1
+top_k=1
+max_output_tokens=2048
+candidate_count=1
 ```
 
 
