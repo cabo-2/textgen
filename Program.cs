@@ -27,6 +27,7 @@ namespace textgen
                 if (openAIHost.GetApiEndpoint() != ApiEndpoint.Gemini)
                     httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             }
+            httpClient.Timeout = Timeout.InfiniteTimeSpan;
         }
 
         static async Task<int> Main(string[] args)
