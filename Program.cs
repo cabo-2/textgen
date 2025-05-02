@@ -115,6 +115,24 @@ namespace textgen
                 // Load parameters from config file if specified
                 var config = await defaultConfig.LoadConfigAsync(configFile, cancellationToken);
 
+
+                bool hasConvLog = !string.IsNullOrEmpty(conversationLogFile);
+                bool hasConvDir = !string.IsNullOrEmpty(conversationLogDirectory);
+                bool hasPromptInput = promptOption.HasValue() || promptFileOption.HasValue();
+                if ((hasConvLog || hasConvDir) && !hasPromptInput)
+                {
+                    return await RunInteractiveAsync(
+                        textGenerator,
+                        defaultConfig,
+                        config,
+                        model,
+                        system,
+                        format,
+                        conversationLogFile,
+                        conversationLogDirectory,
+                        cancellationToken);
+                }
+
                 // Load prompt from file if specified
                 if (!string.IsNullOrEmpty(promptFile))
                 {
@@ -188,6 +206,117 @@ namespace textgen
             });
 
             return await app.ExecuteAsync(args);
+        }
+
+        private static async Task<int> RunInteractiveAsync(
+            TextGenerator textGenerator,
+            IConfig defaultConfig,
+            IConfig config,
+            string model,
+            string system,
+            string format,
+            string convLogFile,
+            string convLogDir,
+            CancellationToken cancellationToken)
+        {
+            OutputResult conversation = new OutputResult();
+            if (!string.IsNullOrEmpty(convLogDir))
+            {
+                var files = Directory.GetFiles(convLogDir, "textgen_log_*.*")
+                    .OrderByDescending(f => f)
+                    .ToList();
+                if (files.Count > 0)
+                {
+                    conversation = await OutputResult.LoadFromFileAsync(files[0], defaultConfig, cancellationToken);
+                }
+            }
+            else if (!string.IsNullOrEmpty(convLogFile) && File.Exists(convLogFile))
+            {
+                conversation = await OutputResult.LoadFromFileAsync(convLogFile, defaultConfig, cancellationToken);
+            }
+
+            string userLabel, assistantLabel;
+            if (config is LlamaConfig lc)
+            {
+                userLabel = lc.Username;
+                assistantLabel = lc.AssistantName;
+            }
+            else if (config is OpenAiConfig oac)
+            {
+                userLabel = oac.Username;
+                assistantLabel = oac.AssistantName;
+            }
+            else
+            {
+                userLabel = "User";
+                assistantLabel = "Assistant";
+            }
+
+            foreach (var (p, c) in conversation.History)
+            {
+                Console.WriteLine($"{userLabel}: {p}");
+                Console.WriteLine($"{assistantLabel}: {c}");
+            }
+            Console.WriteLine();
+
+            bool cancelled = false;
+            Console.CancelKeyPress += (s, e) =>
+            {
+                e.Cancel = true;
+                cancelled = true;
+            };
+
+            Console.WriteLine("Conversation mode started (ends with exit/quit, also ends with Ctrl+C)\n");
+
+            while (!cancelled)
+            {
+                Console.Write($"{userLabel}> ");
+                string input = Console.ReadLine();
+                if (input == null) break;
+                input = input.Trim();
+                if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)
+                 || input.Equals("quit", StringComparison.OrdinalIgnoreCase))
+                    break;
+                if (string.IsNullOrEmpty(input)) continue;
+
+                OutputResult output;
+                try
+                {
+                    output = await textGenerator.GenerateTextAsync(
+                        model, input, system, config, conversation, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error: {ex.Message}");
+                    continue;
+                }
+
+                Console.WriteLine($"{assistantLabel}: {output.Completion}");
+                conversation = output;
+
+                if (!string.IsNullOrEmpty(convLogFile))
+                {
+                    File.WriteAllText(convLogFile, conversation.Format(format));
+                }
+            }
+
+            Console.WriteLine("\nsession ended");
+
+            if (!string.IsNullOrEmpty(convLogDir))
+            {
+                Directory.CreateDirectory(convLogDir);
+                string ts = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+                string ext = format.Equals("json", StringComparison.OrdinalIgnoreCase) ? "json" : "txt";
+                string outFile = Path.Combine(convLogDir, $"textgen_log_{ts}.{ext}");
+                await File.WriteAllTextAsync(outFile, conversation.Format(format), cancellationToken);
+                Console.WriteLine($"Log saved: {outFile}");
+            }
+
+            return 0;
         }
     }
 }
