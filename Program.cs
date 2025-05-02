@@ -301,31 +301,15 @@ namespace textgen
                 Console.WriteLine($"{assistantLabel}: {output.Completion}");
                 conversation = output;
 
-                if (!string.IsNullOrEmpty(convLogFile))
-                {
-                    await File.WriteAllTextAsync(convLogFile, conversation.Format(format), cancellationToken);
-                }
-                else if (!string.IsNullOrEmpty(convLogDir))
-                {
-                    Directory.CreateDirectory(convLogDir);
-                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
-                    string ext = format.Equals("json", StringComparison.OrdinalIgnoreCase) ? "json" : "txt";
-                    string fileName = $"textgen_log_{timestamp}.{ext}";
-                    var outPath = Path.Combine(convLogDir, fileName);
-                    await File.WriteAllTextAsync(outPath, conversation.Format(format), cancellationToken);
-                }
+                await LogManager.SaveConversationAsync(conversation, convLogFile, convLogDir, format, cancellationToken);
             }
 
             Console.WriteLine("\nsession ended");
 
-            if (!string.IsNullOrEmpty(convLogDir))
+            var savedPath = await LogManager.SaveConversationAsync(conversation, convLogFile, convLogDir, format, cancellationToken);
+            if (!string.IsNullOrEmpty(savedPath))
             {
-                Directory.CreateDirectory(convLogDir);
-                string ts = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
-                string ext = format.Equals("json", StringComparison.OrdinalIgnoreCase) ? "json" : "txt";
-                string outFile = Path.Combine(convLogDir, $"textgen_log_{ts}.{ext}");
-                await File.WriteAllTextAsync(outFile, conversation.Format(format), cancellationToken);
-                Console.WriteLine($"Log saved: {outFile}");
+                Console.WriteLine($"Log saved: {savedPath}");
             }
 
             return 0;

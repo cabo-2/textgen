@@ -35,7 +35,7 @@ namespace textgen
             return new OutputResult();
         }
 
-        public static async Task SaveConversationAsync(
+        public static async Task<string> SaveConversationAsync(
             OutputResult conversation,
             string convLogFile,
             string convLogDir,
@@ -48,6 +48,7 @@ namespace textgen
                 if (!string.IsNullOrEmpty(dir))
                     Directory.CreateDirectory(dir);
                 await File.WriteAllTextAsync(convLogFile, conversation.Format(format), cancellationToken);
+                return convLogFile;
             }
             else if (!string.IsNullOrEmpty(convLogDir))
             {
@@ -55,9 +56,11 @@ namespace textgen
                 string ts = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
                 string ext = format.Equals("json", StringComparison.OrdinalIgnoreCase) ? "json" : "txt";
                 string fileName = $"textgen_log_{ts}.{ext}";
-                var path = Path.Combine(convLogDir, fileName);
+                string path = Path.Combine(convLogDir, fileName);
                 await File.WriteAllTextAsync(path, conversation.Format(format), cancellationToken);
+                return path;
             }
+            return null;
         }
 
         public static async Task SaveOutputAsync(
