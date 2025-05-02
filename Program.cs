@@ -186,7 +186,7 @@ namespace textgen
             }
 
             PromptSet promptSet = PromptSet.Create(prompt);
-            OutputResult outputResult = conversationLog.DeepClone();
+            OutputResult outputResult = conversationLog;
             foreach (var input in promptSet.Prompts)
             {
                 outputResult = await textGenerator.GenerateTextAsync(
