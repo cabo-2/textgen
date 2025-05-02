@@ -52,7 +52,6 @@ namespace textgen
             var configOption = app.Option("-c|--config <FNAME>", "Parameter settings file (text, json).", CommandOptionType.SingleValue);
             configOption.Accepts().ExistingFile();
             var conversationLogOption = app.Option("-l|--conversation-log <FNAME>", "File to read and maintain conversation logs.", CommandOptionType.SingleValue);
-            conversationLogOption.Accepts().ExistingFile();
             var conversationLogDirectoryOption = app.Option("-L|--conversation-log-dir <DIR_PATH>", "Directory to read conversation logs from.", CommandOptionType.SingleValue);
             conversationLogDirectoryOption.Accepts().ExistingDirectory();
             var queryOption = app.Option("-q|--query", "Query and list available model names.", CommandOptionType.NoValue);
@@ -220,7 +219,21 @@ namespace textgen
             CancellationToken cancellationToken)
         {
             OutputResult conversation = new OutputResult();
-            if (!string.IsNullOrEmpty(convLogDir))
+            if (!string.IsNullOrEmpty(convLogFile))
+            {
+                if (!File.Exists(convLogFile))
+                {
+                    Console.WriteLine($"Log file not found, creating new: {convLogFile}");
+                    var dir = Path.GetDirectoryName(convLogFile);
+                    if (!string.IsNullOrEmpty(dir))
+                        Directory.CreateDirectory(dir);
+                }
+                else
+                {
+                    conversation = await OutputResult.LoadFromFileAsync(convLogFile, defaultConfig, cancellationToken);
+                }
+            }
+            else if (!string.IsNullOrEmpty(convLogDir))
             {
                 var files = Directory.GetFiles(convLogDir, "textgen_log_*.*")
                     .OrderByDescending(f => f)
@@ -229,10 +242,6 @@ namespace textgen
                 {
                     conversation = await OutputResult.LoadFromFileAsync(files[0], defaultConfig, cancellationToken);
                 }
-            }
-            else if (!string.IsNullOrEmpty(convLogFile) && File.Exists(convLogFile))
-            {
-                conversation = await OutputResult.LoadFromFileAsync(convLogFile, defaultConfig, cancellationToken);
             }
 
             string userLabel, assistantLabel;
@@ -252,13 +261,6 @@ namespace textgen
                 assistantLabel = "Assistant";
             }
 
-            foreach (var (p, c) in conversation.History)
-            {
-                Console.WriteLine($"{userLabel}: {p}");
-                Console.WriteLine($"{assistantLabel}: {c}");
-            }
-            Console.WriteLine();
-
             bool cancelled = false;
             Console.CancelKeyPress += (s, e) =>
             {
@@ -268,6 +270,13 @@ namespace textgen
 
             Console.WriteLine("Conversation mode started (ends with exit/quit, also ends with Ctrl+C)\n");
 
+            foreach (var (p, c) in conversation.History)
+            {
+                Console.WriteLine($"{userLabel}: {p}");
+                Console.WriteLine($"{assistantLabel}: {c}");
+            }
+            Console.WriteLine();
+            
             while (!cancelled)
             {
                 Console.Write($"{userLabel}> ");
@@ -300,7 +309,16 @@ namespace textgen
 
                 if (!string.IsNullOrEmpty(convLogFile))
                 {
-                    File.WriteAllText(convLogFile, conversation.Format(format));
+                    await File.WriteAllTextAsync(convLogFile, conversation.Format(format), cancellationToken);
+                }
+                else if (!string.IsNullOrEmpty(convLogDir))
+                {
+                    Directory.CreateDirectory(convLogDir);
+                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+                    string ext = format.Equals("json", StringComparison.OrdinalIgnoreCase) ? "json" : "txt";
+                    string fileName = $"textgen_log_{timestamp}.{ext}";
+                    var outPath = Path.Combine(convLogDir, fileName);
+                    await File.WriteAllTextAsync(outPath, conversation.Format(format), cancellationToken);
                 }
             }
 
