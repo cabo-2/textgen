@@ -108,16 +108,16 @@ namespace textgen
                 var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient, apiKey);
                 if (textGenerator == null)
                     return 1;
-                    
+
                 var defaultConfig = textGenerator.CreateDefaultConfig();
 
                 // Load parameters from config file if specified
                 var config = await defaultConfig.LoadConfigAsync(configFile, cancellationToken);
 
-
                 bool hasConvLog = !string.IsNullOrEmpty(conversationLogFile);
                 bool hasConvDir = !string.IsNullOrEmpty(conversationLogDirectory);
                 bool hasPromptInput = promptOption.HasValue() || promptFileOption.HasValue();
+
                 if ((hasConvLog || hasConvDir) && !hasPromptInput)
                 {
                     return await RunInteractiveAsync(
@@ -132,79 +132,73 @@ namespace textgen
                         cancellationToken);
                 }
 
-                // Load prompt from file if specified
-                if (!string.IsNullOrEmpty(promptFile))
-                {
-                    prompt = await File.ReadAllTextAsync(promptFile, cancellationToken);
-                }
-
-                // Load system prompt from file if specified
-                if (!string.IsNullOrEmpty(systemFile))
-                {
-                    system = await File.ReadAllTextAsync(systemFile, cancellationToken);
-                }
-
-                OutputResult conversationLog = new OutputResult();
-
-                // Load conversation history either from a directory or a specific file
-                if (!string.IsNullOrEmpty(conversationLogDirectory))
-                {
-                    var files = Directory.GetFiles(conversationLogDirectory, "textgen_log_*.*")
-                        .OrderByDescending(f => f)
-                        .ToList();
-
-                    if (files.Count > 0)
-                    {
-                        string latestFile = files[0];
-                        conversationLog = await OutputResult.LoadFromFileAsync(latestFile, defaultConfig, cancellationToken);
-                    }
-                }
-                else if (!string.IsNullOrEmpty(conversationLogFile))
-                {
-                    conversationLog = await OutputResult.LoadFromFileAsync(conversationLogFile, defaultConfig, cancellationToken);
-                }
-
-                // Validate inputs
-                if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
-                {
-                    Console.WriteLine("Error: Model and prompt must be specified.");
-                    return 1;
-                }
-
-                PromptSet promptSet = PromptSet.Create(prompt);
-                OutputResult outputResult = conversationLog.DeepClone();
-                foreach (var input in promptSet.Prompts)
-                {
-                    outputResult = await textGenerator.GenerateTextAsync(model, input, system, config, outputResult, cancellationToken);
-                    // Always output to console
-                    Console.WriteLine(outputResult.Completion);
-                }
-
-                // Output result in the desired format
-                string formattedOutput = outputResult.Format(format);
-                if (!string.IsNullOrEmpty(outputFile))
-                {
-                    await File.WriteAllTextAsync(outputFile, formattedOutput, cancellationToken);
-                }
-                else if (!string.IsNullOrEmpty(outputDirectory))
-                {
-                    // Ensure the directory exists
-                    Directory.CreateDirectory(outputDirectory);
-
-                    // Create the file name
-                    string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");
-                    string fileExtension = format == "json" ? "json" : "txt";
-                    string fileName = $"textgen_log_{timestamp}.{fileExtension}";
-                    string fullPath = Path.Combine(outputDirectory, fileName);
-
-                    // Write the formatted output to the file
-                    await File.WriteAllTextAsync(fullPath, formattedOutput, cancellationToken);
-                }
-
-                return 0;
+                return await RunBatchAsync(
+                    textGenerator,
+                    defaultConfig,
+                    config,
+                    model,
+                    prompt,
+                    promptFile,
+                    system,
+                    systemFile,
+                    format,
+                    outputFile,
+                    outputDirectory,
+                    conversationLogFile,
+                    conversationLogDirectory,
+                    cancellationToken);
             });
 
             return await app.ExecuteAsync(args);
+        }
+
+        private static async Task<int> RunBatchAsync(
+                TextGenerator textGenerator,
+                IConfig defaultConfig,
+                IConfig config,
+                string model,
+                string prompt,
+                string promptFile,
+                string system,
+                string systemFile,
+                string format,
+                string outputFile,
+                string outputDirectory,
+                string convLogFile,
+                string convLogDir,
+                CancellationToken cancellationToken)
+        {
+            // Load prompt from file if specified
+            if (!string.IsNullOrEmpty(promptFile))
+                prompt = await File.ReadAllTextAsync(promptFile, cancellationToken);
+            // Load system prompt from file if specified
+            if (!string.IsNullOrEmpty(systemFile))
+                system = await File.ReadAllTextAsync(systemFile, cancellationToken);
+
+            // Load conversation history
+            var conversationLog = await LogManager.LoadConversationAsync(convLogFile, convLogDir, defaultConfig, cancellationToken);
+
+            // Validate inputs
+            if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
+            {
+                Console.WriteLine("Error: Model and prompt must be specified.");
+                return 1;
+            }
+
+            PromptSet promptSet = PromptSet.Create(prompt);
+            OutputResult outputResult = conversationLog.DeepClone();
+            foreach (var input in promptSet.Prompts)
+            {
+                outputResult = await textGenerator.GenerateTextAsync(
+                    model, input, system, config, outputResult, cancellationToken);
+                Console.WriteLine(outputResult.Completion);
+            }
+
+            // Output result in the desired format
+            string formattedOutput = outputResult.Format(format);
+            await LogManager.SaveOutputAsync(formattedOutput, outputFile, outputDirectory, format, cancellationToken);
+
+            return 0;
         }
 
         private static async Task<int> RunInteractiveAsync(
@@ -276,7 +270,7 @@ namespace textgen
                 Console.WriteLine($"{assistantLabel}: {c}");
             }
             Console.WriteLine();
-            
+
             while (!cancelled)
             {
                 Console.Write($"{userLabel}> ");
