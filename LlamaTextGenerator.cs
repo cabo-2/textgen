@@ -14,7 +14,7 @@ namespace textgen
 {
     public class LlamaTextGenerator : TextGenerator
     {
-        public LlamaTextGenerator(HttpClient httpClient, string apiHost) : base(httpClient, apiHost)
+        public LlamaTextGenerator(HttpClient httpClient, string apiHost, ILogger logger = null) : base(httpClient, apiHost, logger)
         { }
 
         public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
@@ -73,7 +73,7 @@ namespace textgen
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
             var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(_apiHost, content, cancellationToken);
+            var response = await _httpClient.PostAsync(_apiHost, content, cancellationToken);      
             response.EnsureSuccessStatusCode();
 
             if (config.Stream)
@@ -82,7 +82,7 @@ namespace textgen
             }
             else
             {
-                var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
+                var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);           
                 dynamic result = JsonConvert.DeserializeObject(jsonResponse);
 
                 return new OutputResult
@@ -112,7 +112,9 @@ namespace textgen
                 {
                     if (line.StartsWith("data:"))
                     {
+                        _logger?.Log($"STREAM {line}");
                         line = line.Substring("data:".Length).Trim();
+
                         if (!string.IsNullOrEmpty(line))
                         {
                             dynamic result = JsonConvert.DeserializeObject(line);

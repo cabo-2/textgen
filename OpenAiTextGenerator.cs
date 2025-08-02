@@ -14,7 +14,7 @@ namespace textgen
 {
     public class OpenAiTextGenerator : TextGenerator
     {
-        public OpenAiTextGenerator(HttpClient httpClient, string apiHost) : base(httpClient, apiHost)
+        public OpenAiTextGenerator(HttpClient httpClient, string apiHost, ILogger logger = null) : base(httpClient, apiHost, logger)
         { }
 
         public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
@@ -102,8 +102,10 @@ namespace textgen
                 while ((line = await reader.ReadLineAsync()) != null)
                 {                    
                     if (line.StartsWith("data:"))
-                    {                        
-                        line = line.Substring("data:".Length).Trim();                        
+                    {
+                        _logger?.Log($"STREAM {line}");                        
+                        line = line.Substring("data:".Length).Trim();
+
                         if (!string.IsNullOrWhiteSpace(line) && line != "[DONE]")
                         {
                             dynamic result = JsonConvert.DeserializeObject(line);

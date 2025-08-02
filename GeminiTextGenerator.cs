@@ -16,7 +16,7 @@ namespace textgen
     {
         private readonly string _apiKey;
 
-        public GeminiTextGenerator(HttpClient httpClient, string apiHost, string apiKey) : base(httpClient, apiHost)
+        public GeminiTextGenerator(HttpClient httpClient, string apiHost, string apiKey, ILogger logger = null) : base(httpClient, apiHost, logger)
         {
             _apiKey = apiKey;
         }

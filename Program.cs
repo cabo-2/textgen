@@ -14,21 +14,12 @@ namespace textgen
 {
     public class Program
     {
-        private static readonly HttpClient httpClient = new HttpClient();
-        private static string openAIHost;
-        private static readonly string apiKey;
-
-        static Program()
-        {
-            openAIHost = Environment.GetEnvironmentVariable("OPENAI_API_HOST") ?? "http://localhost:8081/completion";
-            apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
-            if (!string.IsNullOrEmpty(apiKey))
-            {
-                if (openAIHost.GetApiEndpoint() != ApiEndpoint.Gemini)
-                    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-            }
-            httpClient.Timeout = Timeout.InfiniteTimeSpan;
-        }
+        // Kept static for env lookup convenience
+        private static string openAIHost =
+            Environment.GetEnvironmentVariable("OPENAI_API_HOST")
+            ?? "http://localhost:8081/completion";
+        private static readonly string apiKey =
+            Environment.GetEnvironmentVariable("OPENAI_API_KEY");
 
         static async Task<int> Main(string[] args)
         {
@@ -55,16 +46,37 @@ namespace textgen
             var conversationLogDirectoryOption = app.Option("-L|--conversation-log-dir <DIR_PATH>", "Directory to read conversation logs from.", CommandOptionType.SingleValue);
             conversationLogDirectoryOption.Accepts().ExistingDirectory();
             var queryOption = app.Option("-q|--query", "Query and list available model names.", CommandOptionType.NoValue);
+            var debugOption = app.Option("-d|--debug:<FILE_PATH>", "Real-time API logging.  No value -> stderr.  File path -> append log file.", CommandOptionType.SingleOrNoValue);
 
             app.HelpOption("-h|--help");
             app.VersionOption("-v|--version", "1.0.0");
 
             app.OnExecuteAsync(async (cancellationToken) =>
             {
+                // Create ILogger (if any)
+                ILogger logger = null;
+                if (debugOption.HasValue())
+                {
+                    var debugFile = debugOption.Value();
+                    if (!string.IsNullOrEmpty(debugFile))
+                        logger = new FileLogger(debugFile);
+                    else
+                        logger = new ConsoleLogger();
+                }
+
+                // HttpClient w/ optional LoggingHandler
+                HttpMessageHandler inner = new HttpClientHandler();
+                if (logger != null) inner = new LoggingHandler(inner, logger);
+                var httpClient = new HttpClient(inner) { Timeout = Timeout.InfiniteTimeSpan };
+
+                if (!string.IsNullOrEmpty(apiKey) && openAIHost.GetApiEndpoint() != ApiEndpoint.Gemini)
+                    httpClient.DefaultRequestHeaders.Authorization =
+                        new AuthenticationHeaderValue("Bearer", apiKey);
+
                 // If query option is specified, handle it and exit
                 if (queryOption.HasValue())
                 {
-                    var provider = TextGeneratorFactory.CreateModelProvider(openAIHost, httpClient, apiKey);
+                    var provider = TextGeneratorFactory.CreateModelProvider(openAIHost, httpClient, apiKey, logger);
                     if (provider == null)
                     {
                         Console.WriteLine("Unsupported endpoint.");
@@ -105,7 +117,7 @@ namespace textgen
                 }
 
                 // Determine the text generator and configuration to use
-                var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient, apiKey);
+                var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient, apiKey, logger);
                 if (textGenerator == null)
                     return 1;
 
