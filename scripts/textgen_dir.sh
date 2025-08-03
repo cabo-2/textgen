@@ -13,11 +13,12 @@ usage() {
   echo "                                    Default value is: text."
   echo "  -c|--config <FNAME>               Parameter settings file (text, json)."
   echo "  -l|--conversation-log <FNAME>     File to read and maintain conversation logs."
+  echo "  -d|--debug <FNAME>                Real-time API logging."
   echo "  -h|--help                         Show help information."
 }
 
 # Define the options for getopt
-options="i:o:m:s:f:c:l:h"
+options="i:o:m:s:f:c:l:d:h"
 
 # Parse the command-line arguments
 while getopts "$options" opt; do
@@ -42,6 +43,9 @@ while getopts "$options" opt; do
       ;;
     l)
       log="$OPTARG"
+      ;;
+    d)
+      debug="$OPTARG"
       ;;
     h)
       usage
@@ -100,5 +104,6 @@ find "$input_dir_full" -maxdepth 1 -type f -print0 | while IFS= read -r -d $'\0'
     -S "$system_file" \
     ${format:+-f "$format"} \
     ${config:+-c "$config"} \
-    ${log:+-l "$log"}
+    ${log:+-l "$log"} \
+    ${debug:+-d:"$debug"}
 done
