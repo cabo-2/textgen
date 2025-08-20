@@ -12,4 +12,10 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
+  <!-- Exclude sample code from build -->
+  <ItemGroup>
+    <Compile Remove="samples/**" />
+    <None Include="samples/**" />
+  </ItemGroup>
+
 </Project>
