@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace textgen
+namespace Textgen
 {
     public interface IConfig
     {

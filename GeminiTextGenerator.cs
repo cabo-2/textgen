@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 
-namespace textgen
+namespace Textgen
 {
     public class GeminiTextGenerator : TextGenerator
     {

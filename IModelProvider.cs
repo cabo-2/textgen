@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace textgen
+namespace Textgen
 {
     public interface IModelProvider
     {

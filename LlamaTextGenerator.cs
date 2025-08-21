@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 
-namespace textgen
+namespace Textgen
 {
     public class LlamaTextGenerator : TextGenerator
     {
@@ -73,7 +73,7 @@ namespace textgen
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
             var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
-            var response = await _httpClient.PostAsync(_apiHost, content, cancellationToken);      
+            var response = await _httpClient.PostAsync(_apiHost, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             if (config.Stream)
@@ -82,7 +82,7 @@ namespace textgen
             }
             else
             {
-                var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);           
+                var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
                 dynamic result = JsonConvert.DeserializeObject(jsonResponse);
 
                 return new OutputResult

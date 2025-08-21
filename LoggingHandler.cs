@@ -3,7 +3,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace textgen
+namespace Textgen
 {
     /// <summary>
     /// DelegatingHandler that mirrors request / response data to an ILogger.

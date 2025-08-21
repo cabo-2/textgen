@@ -1,7 +1,7 @@
 using System;
 using System.Text.Json;
 
-namespace textgen
+namespace Textgen
 {
     public static class ObjectExtensions
     {

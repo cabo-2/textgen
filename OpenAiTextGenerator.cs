@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Newtonsoft.Json;
 
-namespace textgen
+namespace Textgen
 {
     public class OpenAiTextGenerator : TextGenerator
     {
@@ -100,10 +100,10 @@ namespace textgen
                 var completionText = new StringBuilder();
                 string line;
                 while ((line = await reader.ReadLineAsync()) != null)
-                {                    
+                {
                     if (line.StartsWith("data:"))
                     {
-                        _logger?.Log($"STREAM {line}");                        
+                        _logger?.Log($"STREAM {line}");
                         line = line.Substring("data:".Length).Trim();
 
                         if (!string.IsNullOrWhiteSpace(line) && line != "[DONE]")
@@ -112,7 +112,7 @@ namespace textgen
                             string content = result.choices[0].delta?.content;
                             if (!string.IsNullOrEmpty(content))
                             {
-                                completionText.Append(content);                                
+                                completionText.Append(content);
                             }
                         }
                     }

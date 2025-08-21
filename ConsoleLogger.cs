@@ -1,6 +1,6 @@
 using System;
 
-namespace textgen
+namespace Textgen
 {
     public sealed class ConsoleLogger : ILogger
     {

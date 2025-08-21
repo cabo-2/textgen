@@ -1,4 +1,4 @@
-namespace textgen
+namespace Textgen
 {
     /// <summary>Very small logging abstraction so we stay dependency-free.</summary>
     public interface ILogger

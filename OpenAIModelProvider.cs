@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
-namespace textgen
+namespace Textgen
 {
     public class OpenAIModelProvider : IModelProvider
     {

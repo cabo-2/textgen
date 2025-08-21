@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace textgen
+namespace Textgen
 {
     public sealed class FileLogger : ILogger, IDisposable
     {
