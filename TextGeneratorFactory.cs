@@ -1,5 +1,3 @@
-using System;
-
 namespace Textgen
 {
     public static class TextGeneratorFactory

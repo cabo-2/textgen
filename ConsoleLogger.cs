@@ -1,5 +1,3 @@
-using System;
-
 namespace Textgen
 {
     public sealed class ConsoleLogger : ILogger
