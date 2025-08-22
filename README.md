@@ -31,6 +31,7 @@ cd textgen
 2. **Build the application**
 
 ```bash
+cd cli
 dotnet build
 ```
 
@@ -68,6 +69,8 @@ Options
     -L|--conversation-log-dir <DIR_PATH>: Directory to read conversation logs.
 
     -q|--query: Query and list available model names.
+
+    -d|--debug[:<FILE_PATH>] Real-time API logging. No value -> stderr. File path -> append log file.
 
     -h|--help: Show help information.
 
