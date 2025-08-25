@@ -272,6 +272,11 @@ namespace Textgen
                 Console.WriteLine($"{userLabel}: {p}");
                 Console.WriteLine($"{assistantLabel}: {c}");
             }
+            if (!string.IsNullOrEmpty(conversation.Prompt) || !string.IsNullOrEmpty(conversation.Completion))
+            {
+                Console.WriteLine($"{userLabel}: {conversation.Prompt}");
+                Console.WriteLine($"{assistantLabel}: {conversation.Completion}");
+            }
             Console.WriteLine();
 
             while (!cancelled)
@@ -296,7 +301,7 @@ namespace Textgen
                     break;
                 }
                 catch (Exception ex)
-                {
+                {                    
                     Console.Error.WriteLine($"Error: {ex.Message}");
                     continue;
                 }
