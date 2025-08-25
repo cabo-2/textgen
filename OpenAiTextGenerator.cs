@@ -100,7 +100,15 @@ namespace Textgen
                         if (!string.IsNullOrWhiteSpace(line) && line != "[DONE]")
                         {
                             dynamic result = JsonConvert.DeserializeObject(line);
-                            string content = result.choices[0].delta?.content;
+                            string content;
+                            try
+                            {
+                                content = result.choices[0].delta?.content;
+                            }
+                            catch(ArgumentOutOfRangeException)
+                            {
+                                content = null;
+                            }
                             if (!string.IsNullOrEmpty(content))
                             {
                                 completionText.Append(content);
