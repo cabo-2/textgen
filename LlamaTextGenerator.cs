@@ -45,12 +45,21 @@ namespace Textgen
             sb.Append($"{config.Username}: {prompt}\n\n");
             sb.Append($"{config.AssistantName}: ");
 
+            List<string> stop = new();
+            if (config.Stop)
+            {
+                stop.Add("</s>");
+                stop.Add($"{config.Username}:");
+                stop.Add($"{config.AssistantName}:");
+            }
+
             var requestBody = new
             {
                 prompt = sb.ToString(),
                 n_predict = config.NPredict,
                 seed = config.Seed,
                 temperature = config.Temperature,
+                stop,
                 top_k = config.TopK,
                 top_p = config.TopP,
                 min_p = config.MinP,
@@ -58,7 +67,8 @@ namespace Textgen
                 frequency_penalty = config.FrequencyPenalty,
                 repeat_penalty = config.RepeatPenalty,
                 stream = config.Stream,
-                cache_prompt = config.CachePrompt
+                cache_prompt = config.CachePrompt,
+                slot_id = config.SlotId
             };
 
             var jsonRequest = JsonConvert.SerializeObject(requestBody);

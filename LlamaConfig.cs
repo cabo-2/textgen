@@ -18,6 +18,8 @@ namespace Textgen
             RepeatPenalty = 1.1,
             Stream = true,
             CachePrompt = true,
+            SlotId = -1,
+            Stop = true,
             Username = "user",
             AssistantName = "assistant"
         };
@@ -33,6 +35,8 @@ namespace Textgen
         public double RepeatPenalty { get; set; }
         public bool Stream { get; set; }
         public bool CachePrompt { get; set; }
+        public int SlotId { get; set; }
+        public bool Stop { get; set; }
         public string Username { get; set; }
         public string AssistantName { get; set; }
 
@@ -67,6 +71,8 @@ namespace Textgen
                     RepeatPenalty = config.repeat_penalty ?? value.RepeatPenalty,
                     Stream = config.stream ?? value.Stream,
                     CachePrompt = config.cache_prompt ?? value.CachePrompt,
+                    SlotId = config.slot_id ?? value.SlotId,
+                    Stop = config.stop ?? value.Stop,
                     Username = config.username ?? value.Username,
                     AssistantName = config.assistant_name ?? value.AssistantName
                 };
@@ -87,6 +93,8 @@ namespace Textgen
             sb.Append($"repeat_penalty={RepeatPenalty}\n");
             sb.Append($"stream={Stream.ToString().ToLower()}\n");
             sb.Append($"cache_prompt={CachePrompt.ToString().ToLower()}\n");
+            sb.Append($"slot_id={SlotId}\n");
+            sb.Append($"stop={Stop.ToString().ToLower()}\n");
             sb.Append($"username={Username}\n");
             sb.Append($"assistant_name={AssistantName}\n");
             return sb.ToString();
@@ -118,6 +126,8 @@ namespace Textgen
                         case "repeat_penalty": config.RepeatPenalty = double.Parse(value); break;
                         case "stream": config.Stream = bool.Parse(value); break;
                         case "cache_prompt": config.CachePrompt = bool.Parse(value); break;
+                        case "slot_id": config.SlotId = int.Parse(value); break;
+                        case "stop": config.Stop = bool.Parse(value); break;
                         case "username": config.Username = value; break;
                         case "assistant_name": config.AssistantName = value; break;
                     }
