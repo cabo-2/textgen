@@ -31,14 +31,47 @@ namespace Textgen
             if (resp.Content != null &&
                 resp.Content.Headers.ContentType?.MediaType != "text/event-stream")
             {
-                var body = await resp.Content.ReadAsStringAsync(cancellationToken);
-                _logger.Log($"<-- BODY {body}");
+                var originalHeaders = resp.Content.Headers
+                    .Select(h => new KeyValuePair<string, IEnumerable<string>>(h.Key, h.Value.ToArray()))
+                    .ToList();
 
-                // replace consumed content so caller can still read
-                resp.Content = new StringContent(body, Encoding.UTF8,
-                    resp.Content.Headers.ContentType?.MediaType);
+                var bytes = await resp.Content.ReadAsByteArrayAsync(cancellationToken);
+                var charset = resp.Content.Headers.ContentType?.CharSet;
+                var bodyText = DecodeBody(bytes, charset);
+                _logger.Log($"<-- BODY {bodyText}");
+
+                var bufferedContent = new ByteArrayContent(bytes);
+                foreach (var header in originalHeaders)
+                {
+                    if (string.Equals(header.Key, "Content-Length", StringComparison.OrdinalIgnoreCase))
+                        continue; // ByteArrayContent manages its own length
+
+                    bufferedContent.Headers.TryAddWithoutValidation(header.Key, header.Value);
+                }
+
+                resp.Content = bufferedContent;
             }
             return resp;
+        }
+
+        private static string DecodeBody(byte[] bytes, string charset)
+        {
+            if (bytes == null || bytes.Length == 0)
+                return string.Empty;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(charset))
+                {
+                    return Encoding.GetEncoding(charset).GetString(bytes);
+                }
+            }
+            catch (ArgumentException)
+            {
+                // Fall back to UTF-8 below when charset is unknown to the runtime
+            }
+
+            return Encoding.UTF8.GetString(bytes);
         }
     }
 }
