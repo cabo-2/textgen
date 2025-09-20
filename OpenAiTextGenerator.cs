@@ -5,6 +5,9 @@ namespace Textgen
 {
     public class OpenAiTextGenerator : TextGenerator
     {
+        private const string UserRole = "user";
+        private const string AssistantRole = "assistant";
+
         public OpenAiTextGenerator(HttpClient httpClient, string apiHost, ILogger logger = null) : base(httpClient, apiHost, logger)
         { }
 
@@ -14,34 +17,35 @@ namespace Textgen
 
             var history = new List<(string, string)>();
             // Add system to messages
-            var messages = new List<dynamic>
+            var messages = new List<dynamic>();
+            if (!string.IsNullOrEmpty(system))
             {
-                new { role = "system", content = system ?? "" }
-            };
+                messages.Add(new { role = "system", content = system });
+            }
 
             // Add conversation history to messages
             foreach (var entry in conversationLog.History)
             {
                 if (!string.IsNullOrEmpty(entry.Prompt))
-                    messages.Add(new { role = config.Username, content = entry.Prompt });
+                    messages.Add(new { role = UserRole, content = entry.Prompt });
 
                 if (!string.IsNullOrEmpty(entry.Completion))
-                    messages.Add(new { role = config.AssistantName, content = entry.Completion });
+                    messages.Add(new { role = AssistantRole, content = entry.Completion });
 
                 if (!string.IsNullOrEmpty(entry.Prompt) || !string.IsNullOrEmpty(entry.Completion))
                     history.Add((entry.Prompt ?? "", entry.Completion ?? ""));
             }
 
             if (!string.IsNullOrEmpty(conversationLog.Prompt))
-                messages.Add(new { role = config.Username, content = conversationLog.Prompt });
+                messages.Add(new { role = UserRole, content = conversationLog.Prompt });
 
             if (!string.IsNullOrEmpty(conversationLog.Completion))
-                messages.Add(new { role = config.AssistantName, content = conversationLog.Completion });
+                messages.Add(new { role = AssistantRole, content = conversationLog.Completion });
 
             if (!string.IsNullOrEmpty(conversationLog.Prompt) || !string.IsNullOrEmpty(conversationLog.Completion))
                 history.Add((conversationLog.Prompt ?? "", conversationLog.Completion ?? ""));
 
-            messages.Add(new { role = config.Username, content = prompt }); // current user prompt      
+            messages.Add(new { role = UserRole, content = prompt }); // current user prompt
 
             var requestBody = new
             {

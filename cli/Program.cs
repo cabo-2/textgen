@@ -242,15 +242,10 @@ namespace Textgen
             }
 
             string userLabel, assistantLabel;
-            if (config is LlamaConfig lc)
+            if (config is LlamaConfig llamaConfig)
             {
-                userLabel = lc.Username;
-                assistantLabel = lc.AssistantName;
-            }
-            else if (config is OpenAiConfig oac)
-            {
-                userLabel = oac.Username;
-                assistantLabel = oac.AssistantName;
+                userLabel = llamaConfig.Username;
+                assistantLabel = llamaConfig.AssistantName;
             }
             else
             {

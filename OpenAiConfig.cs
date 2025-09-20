@@ -11,9 +11,7 @@ namespace Textgen
             Seed = 0,
             Temperature = 0.7,
             TopP = 1,
-            Stream = true,
-            Username = "user",
-            AssistantName = "assistant"
+            Stream = true
         };
 
         public int MaxTokens { get; set; }
@@ -21,8 +19,6 @@ namespace Textgen
         public double Temperature { get; set; }
         public double TopP { get; set; }
         public bool Stream { get; set; }
-        public string Username { get; set; }
-        public string AssistantName { get; set; }
 
         public async Task<IConfig> LoadConfigAsync(string configFile, CancellationToken cancellationToken)
         {
@@ -48,9 +44,7 @@ namespace Textgen
                     Seed = config.seed ?? value.Seed,
                     Temperature = config.temperature ?? value.Temperature,
                     TopP = config.top_p ?? value.TopP,
-                    Stream = config.stream ?? value.Stream,
-                    Username = config.username ?? value.Username,
-                    AssistantName = config.assistant_name ?? value.AssistantName
+                    Stream = config.stream ?? value.Stream
                 };
             }
         }
@@ -63,8 +57,6 @@ namespace Textgen
             sb.Append($"temperature={Temperature}\n");
             sb.Append($"top_p={TopP}\n");
             sb.Append($"stream={Stream.ToString().ToLower()}\n");
-            sb.Append($"username={Username}\n");
-            sb.Append($"assistant_name={AssistantName}\n");
             return sb.ToString();
         }
 
@@ -88,8 +80,10 @@ namespace Textgen
                         case "temperature": config.Temperature = double.Parse(value); break;
                         case "top_p": config.TopP = double.Parse(value); break;
                         case "stream": config.Stream = bool.Parse(value); break;
-                        case "username": config.Username = value; break;
-                        case "assistant_name": config.AssistantName = value; break;
+                        case "username":
+                        case "assistant_name":
+                            // Ignore legacy keys to remain backward compatible.
+                            break;
                     }
                 }
             }
