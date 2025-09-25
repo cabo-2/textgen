@@ -36,6 +36,8 @@ namespace Textgen
             var conversationLogOption = app.Option("-l|--conversation-log <FNAME>", "File to read and maintain conversation logs.", CommandOptionType.SingleValue);
             var conversationLogDirectoryOption = app.Option("-L|--conversation-log-dir <DIR_PATH>", "Directory to read conversation logs from.", CommandOptionType.SingleValue);
             conversationLogDirectoryOption.Accepts().ExistingDirectory();
+            var restoreCacheOption = app.Option("-rc|--restore-cache <FNAME>", "Restore llama-server cache before sending chat messages.", CommandOptionType.SingleValue);
+            var saveCacheOption = app.Option("-sc|--save-cache <FNAME>", "Save llama-server cache after sending chat messages.", CommandOptionType.SingleValue);
             var queryOption = app.Option("-q|--query", "Query and list available model names.", CommandOptionType.NoValue);
             var debugOption = app.Option("-d|--debug:<FILE_PATH>", "Real-time API logging.  No value -> stderr.  File path -> append log file.", CommandOptionType.SingleOrNoValue);
 
@@ -60,9 +62,45 @@ namespace Textgen
                 if (logger != null) inner = new LoggingHandler(inner, logger);
                 var httpClient = new HttpClient(inner) { Timeout = Timeout.InfiniteTimeSpan };
 
-                if (!string.IsNullOrEmpty(apiKey) && openAIHost.GetApiEndpoint() != ApiEndpoint.Gemini)
+                var apiEndpoint = openAIHost.GetApiEndpoint();
+
+                if (!string.IsNullOrEmpty(apiKey) && apiEndpoint != ApiEndpoint.Gemini)
                     httpClient.DefaultRequestHeaders.Authorization =
                         new AuthenticationHeaderValue("Bearer", apiKey);
+
+                var cacheOptions = new CacheActionOptions(restoreCacheOption.Value(), saveCacheOption.Value());
+                var isOfficialOpenAiHost = openAIHost.IsOfficialOpenAiHost();
+
+                if (restoreCacheOption.HasValue() && string.IsNullOrWhiteSpace(cacheOptions.RestoreFile))
+                {
+                    Console.Error.WriteLine("Error: --restore-cache requires a filename.");
+                    return 1;
+                }
+
+                if (saveCacheOption.HasValue() && string.IsNullOrWhiteSpace(cacheOptions.SaveFile))
+                {
+                    Console.Error.WriteLine("Error: --save-cache requires a filename.");
+                    return 1;
+                }
+
+                if (cacheOptions.HasAny)
+                {
+                    bool cacheSupported = apiEndpoint == ApiEndpoint.Llama
+                        || (apiEndpoint == ApiEndpoint.OpenAi && !isOfficialOpenAiHost);
+
+                    if (!cacheSupported)
+                    {
+                        if (apiEndpoint == ApiEndpoint.OpenAi)
+                        {
+                            Console.Error.WriteLine("Error: Cache save/restore options are not allowed with https://api.openai.com/ hosts.");
+                        }
+                        else
+                        {
+                            Console.Error.WriteLine("Error: Cache save/restore options are only supported with llama-server hosts.");
+                        }
+                        return 1;
+                    }
+                }
 
                 // If query option is specified, handle it and exit
                 if (queryOption.HasValue())
@@ -117,13 +155,25 @@ namespace Textgen
                 // Load parameters from config file if specified
                 var config = await defaultConfig.LoadConfigAsync(configFile, cancellationToken);
 
+                var cacheCoordinator = CacheActionCoordinatorFactory.Create(apiEndpoint, openAIHost, httpClient, cacheOptions, logger);
+
+                try
+                {
+                    await cacheCoordinator.BeforeChatAsync(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error: failed to restore cache - {ex.Message}");
+                    return 1;
+                }
+
                 bool hasConvLog = !string.IsNullOrEmpty(conversationLogFile);
                 bool hasConvDir = !string.IsNullOrEmpty(conversationLogDirectory);
                 bool hasPromptInput = promptOption.HasValue() || promptFileOption.HasValue();
 
                 if ((hasConvLog || hasConvDir) && !hasPromptInput)
                 {
-                    return await RunInteractiveAsync(
+                    var result = await RunInteractiveAsync(
                         textGenerator,
                         defaultConfig,
                         config,
@@ -133,9 +183,22 @@ namespace Textgen
                         conversationLogFile,
                         conversationLogDirectory,
                         cancellationToken);
+                    if (result == 0)
+                    {
+                        try
+                        {
+                            await cacheCoordinator.AfterChatAsync(cancellationToken);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"Error: failed to save cache - {ex.Message}");
+                            return 1;
+                        }
+                    }
+                    return result;
                 }
 
-                return await RunBatchAsync(
+                var exitCode = await RunBatchAsync(
                     textGenerator,
                     defaultConfig,
                     config,
@@ -150,6 +213,21 @@ namespace Textgen
                     conversationLogFile,
                     conversationLogDirectory,
                     cancellationToken);
+
+                if (exitCode == 0)
+                {
+                    try
+                    {
+                        await cacheCoordinator.AfterChatAsync(cancellationToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine($"Error: failed to save cache - {ex.Message}");
+                        return 1;
+                    }
+                }
+
+                return exitCode;
             });
 
             return await app.ExecuteAsync(args);

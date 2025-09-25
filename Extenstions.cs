@@ -34,6 +34,21 @@ namespace Textgen
             }
             return ApiEndpoint.Unsupported;
         }
+
+        public static bool IsOfficialOpenAiHost(this string apiHost)
+        {
+            if (!Uri.TryCreate(apiHost, UriKind.Absolute, out var uri))
+                return false;
+
+            var authority = uri.GetLeftPart(UriPartial.Authority);
+            if (string.IsNullOrEmpty(authority))
+                return false;
+
+            if (!authority.EndsWith("/", StringComparison.Ordinal))
+                authority += "/";
+
+            return string.Equals(authority, "https://api.openai.com/", StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     public enum ApiEndpoint
