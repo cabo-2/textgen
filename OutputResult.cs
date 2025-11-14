@@ -26,8 +26,11 @@ namespace Textgen
                     sb.Append($"@date\n{Date}\n\n");
                     sb.Append($"@host\n{Host}\n\n");
                     sb.Append($"@model\n{Model}\n\n");
-                    sb.Append($"@config\n");
-                    sb.Append(Config.FormatConfig());
+                    sb.Append("@config\n");
+                    if (Config != null)
+                    {
+                        sb.Append(Config.FormatConfig());
+                    }
                     sb.Append("\n");
                     sb.Append($"@system\n{System}\n\n");
 

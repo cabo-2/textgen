@@ -387,10 +387,19 @@ namespace Textgen
 
             Console.WriteLine("\nsession ended");
 
-            var savedPath = await LogManager.SaveConversationAsync(conversation, convLogFile, convLogDir, format, cancellationToken);
-            if (!string.IsNullOrEmpty(savedPath))
+            bool hasConversation =
+                conversation.Config != null ||
+                conversation.History.Count > 0 ||
+                !string.IsNullOrEmpty(conversation.Prompt) ||
+                !string.IsNullOrEmpty(conversation.Completion);
+
+            if (hasConversation)
             {
-                Console.WriteLine($"Log saved: {savedPath}");
+                var savedPath = await LogManager.SaveConversationAsync(conversation, convLogFile, convLogDir, format, cancellationToken);
+                if (!string.IsNullOrEmpty(savedPath))
+                {
+                    Console.WriteLine($"Log saved: {savedPath}");
+                }
             }
 
             return 0;
