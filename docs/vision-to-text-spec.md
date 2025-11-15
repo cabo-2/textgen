@@ -80,9 +80,26 @@ public record ImageAttachment(
 - Use existing `/v1/chat/completions` compatibility layer; encode images base64 in `image_url` entries if server accepts.
 
 ## 9. Output & Logging
-- `OutputResult` gains `IReadOnlyList<ImageAttachmentMetadata>` to echo attachments (without base64 payload) in textual/JSON outputs.
+- `OutputResult` gains `IReadOnlyList<ImageAttachmentMetadata>` to echo attachments (without base64 payload) in textual/JSON outputs. Each item tracks `Role` (`prompt`, `assistant`, `system`, `history_prompt_X`, etc.), canonical path within the run directory (e.g., `images/img_01_receipt.png`), original filename, MIME, size, SHA256, optional caption.
 - Conversation logs store message array including references like `image://sha256/<hash>` to avoid bloating log files.
 - Standard file output remains either plain text (assistant content only) or JSON (includes attachments metadata, provider response headers, usage stats).
+
+### 9.1 Text output sections
+- Prompt-side attachments follow a dedicated block immediately after `@prompt`:
+  ```
+  @prompt
+  The prompt text
+
+  @prompt-images
+  count=2
+  prompt_image_1_path=images/img_01_diagram.png
+  prompt_image_1_caption=System architecture diagram
+  prompt_image_2_path=images/img_02_logs.png
+  prompt_image_2_caption=Web logs excerpt
+  ```
+- Completion-side attachments mirror the same pattern after `@completion` via `@completion-images` with `completion_image_<i>_<field>` entries.
+- Historical turns use `@history-prompt_<n>` / `@history-completion_<n>` paired with `@history-prompt-images_<n>` / `@history-completion-images_<n>` so each turn keeps its own attachment metadata.
+- Blocks only appear when attachments exist; parsers treat `count=0` as a valid empty block to reserve numbering if desired.
 
 ## 10. Error Handling
 - Aggregate validation errors to present a single report.
@@ -116,4 +133,3 @@ public record ImageAttachment(
 - Do we need resumable uploads for very large files? (blocked by provider support)
 - Should we support video frames for future Gemini features?
 - How do we redact sensitive pixels before logging? (possible hashing strategy?)
-
