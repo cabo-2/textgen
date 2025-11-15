@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -15,7 +16,7 @@ namespace Textgen
         {
             OpenAiConfig config = (OpenAiConfig)conf;
 
-            var history = new List<(string, string)>();
+            var history = new List<ConversationTurn>();
             // Add system to messages
             var messages = new List<dynamic>();
             if (!string.IsNullOrEmpty(system))
@@ -32,8 +33,8 @@ namespace Textgen
                 if (!string.IsNullOrEmpty(entry.Completion))
                     messages.Add(new { role = AssistantRole, content = entry.Completion });
 
-                if (!string.IsNullOrEmpty(entry.Prompt) || !string.IsNullOrEmpty(entry.Completion))
-                    history.Add((entry.Prompt ?? "", entry.Completion ?? ""));
+                if (entry.HasContent)
+                    history.Add(entry.Clone());
             }
 
             if (!string.IsNullOrEmpty(conversationLog.Prompt))
@@ -42,8 +43,19 @@ namespace Textgen
             if (!string.IsNullOrEmpty(conversationLog.Completion))
                 messages.Add(new { role = AssistantRole, content = conversationLog.Completion });
 
-            if (!string.IsNullOrEmpty(conversationLog.Prompt) || !string.IsNullOrEmpty(conversationLog.Completion))
-                history.Add((conversationLog.Prompt ?? "", conversationLog.Completion ?? ""));
+            if (!string.IsNullOrEmpty(conversationLog.Prompt) ||
+                !string.IsNullOrEmpty(conversationLog.Completion) ||
+                conversationLog.PromptImages.Count > 0 ||
+                conversationLog.CompletionImages.Count > 0)
+            {
+                history.Add(new ConversationTurn
+                {
+                    Prompt = conversationLog.Prompt,
+                    Completion = conversationLog.Completion,
+                    PromptImages = conversationLog.PromptImages.Select(p => p.Clone()).ToList(),
+                    CompletionImages = conversationLog.CompletionImages.Select(p => p.Clone()).ToList()
+                });
+            }
 
             messages.Add(new { role = UserRole, content = prompt }); // current user prompt
 
@@ -87,7 +99,7 @@ namespace Textgen
             }
         }
 
-        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, OpenAiConfig config, string system, string model, string prompt, List<(string, string)> history)
+        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, OpenAiConfig config, string system, string model, string prompt, List<ConversationTurn> history)
         {
             using (var stream = await response.Content.ReadAsStreamAsync())
             using (var reader = new StreamReader(stream))

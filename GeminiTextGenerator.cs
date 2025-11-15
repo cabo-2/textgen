@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -16,16 +17,28 @@ namespace Textgen
         {
             GeminiConfig config = (GeminiConfig)conf;
 
-            var history = new List<(string, string)>();
-            // Add conversation history to messages
+            var history = new List<ConversationTurn>();
             foreach (var entry in conversationLog.History)
             {
-                if (!string.IsNullOrEmpty(entry.Prompt) || !string.IsNullOrEmpty(entry.Completion))
-                    history.Add((entry.Prompt ?? "", entry.Completion ?? ""));
+                if (entry.HasContent)
+                {
+                    history.Add(entry.Clone());
+                }
             }
 
-            if (!string.IsNullOrEmpty(conversationLog.Prompt) || !string.IsNullOrEmpty(conversationLog.Completion))
-                history.Add((conversationLog.Prompt ?? "", conversationLog.Completion ?? ""));
+            if (!string.IsNullOrEmpty(conversationLog.Prompt) ||
+                !string.IsNullOrEmpty(conversationLog.Completion) ||
+                conversationLog.PromptImages.Count > 0 ||
+                conversationLog.CompletionImages.Count > 0)
+            {
+                history.Add(new ConversationTurn
+                {
+                    Prompt = conversationLog.Prompt,
+                    Completion = conversationLog.Completion,
+                    PromptImages = conversationLog.PromptImages.Select(p => p.Clone()).ToList(),
+                    CompletionImages = conversationLog.CompletionImages.Select(p => p.Clone()).ToList()
+                });
+            }
 
             // Construct the messages for the Gemini API request
             var contents = new List<dynamic>();
@@ -40,21 +53,21 @@ namespace Textgen
             }
             foreach (var entry in history)
             {
-                if (!string.IsNullOrEmpty(entry.Item1))
+                if (!string.IsNullOrEmpty(entry.Prompt))
                 {
                     contents.Add(new
                     {
                         role = "user",
-                        parts = new[] { new { text = entry.Item1 } }
+                        parts = new[] { new { text = entry.Prompt } }
                     });
                 }
 
-                if (!string.IsNullOrEmpty(entry.Item2))
+                if (!string.IsNullOrEmpty(entry.Completion))
                 {
                     contents.Add(new
                     {
                         role = "model",
-                        parts = new[] { new { text = entry.Item2 } }
+                        parts = new[] { new { text = entry.Completion } }
                     });
                 }
             }

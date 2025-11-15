@@ -1,44 +1,33 @@
+using System.Collections.Generic;
+using System;
+using System.Linq;
 using System.Text;
 
 namespace Textgen
 {
-    public enum PromptType
+    public static class PromptSequenceBuilder
     {
-        Plain,
-        Structured
-    }
-
-    public class PromptSet
-    {
-        private PromptSet(List<string> prompts, PromptType type)
-        {
-            Prompts = prompts ?? new List<string>();
-            Type = type;
-        }
-
-        public List<string> Prompts { get; private set; }
-        public PromptType Type { get; private set; }
-
-        public bool IsValid => Prompts.Count > 0;
-
-        public static PromptSet Create(string prompt)
+        public static PromptSequence FromString(string prompt)
         {
             if (string.IsNullOrWhiteSpace(prompt))
             {
-                return new PromptSet(new List<string>(), PromptType.Plain);
+                return new PromptSequence(new List<PromptMessage>(), PromptInputType.Plain);
             }
 
-            var prompts = new List<string>();
-
-            if (TryParseStructuredPrompt(prompt, out var extractedPrompts))
+            if (TryParseStructuredPrompt(prompt, out var prompts))
             {
-                return new PromptSet(extractedPrompts, PromptType.Structured);
+                var structuredMessages = prompts
+                    .Select(p => new PromptMessage(p))
+                    .ToList();
+                return new PromptSequence(structuredMessages, PromptInputType.Structured);
             }
             else
             {
-                // Treat as plain prompt
-                prompts.Add(prompt.Trim());
-                return new PromptSet(prompts, PromptType.Plain);
+                var messages = new List<PromptMessage>
+                {
+                    new PromptMessage(prompt.Trim())
+                };
+                return new PromptSequence(messages, PromptInputType.Plain);
             }
         }
 
@@ -64,7 +53,6 @@ namespace Textgen
                 }
             }
 
-            // Return true if any structured prompts were found; otherwise, return false
             return foundStructured;
         }
     }

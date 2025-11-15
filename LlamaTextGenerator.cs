@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -13,7 +14,7 @@ namespace Textgen
             LlamaConfig config = conf as LlamaConfig;
 
             StringBuilder sb = new StringBuilder();
-            var history = new List<(string, string)>();
+            var history = new List<ConversationTurn>();
 
             // Add system to request prompt
             if (!string.IsNullOrEmpty(system))
@@ -28,8 +29,8 @@ namespace Textgen
                 if (!string.IsNullOrEmpty(entry.Completion))
                     sb.Append($"{config.AssistantName}: {entry.Completion}\n\n");
 
-                if (!string.IsNullOrEmpty(entry.Prompt) || !string.IsNullOrEmpty(entry.Completion))
-                    history.Add((entry.Prompt ?? "", entry.Completion ?? ""));
+                if (entry.HasContent)
+                    history.Add(entry.Clone());
             }
 
             if (!string.IsNullOrEmpty(conversationLog.Prompt))
@@ -38,8 +39,19 @@ namespace Textgen
             if (!string.IsNullOrEmpty(conversationLog.Completion))
                 sb.Append($"{config.AssistantName}: {conversationLog.Completion}\n\n");
 
-            if (!string.IsNullOrEmpty(conversationLog.Prompt) || !string.IsNullOrEmpty(conversationLog.Completion))
-                history.Add((conversationLog.Prompt ?? "", conversationLog.Completion ?? ""));
+            if (!string.IsNullOrEmpty(conversationLog.Prompt) ||
+                !string.IsNullOrEmpty(conversationLog.Completion) ||
+                conversationLog.PromptImages.Count > 0 ||
+                conversationLog.CompletionImages.Count > 0)
+            {
+                history.Add(new ConversationTurn
+                {
+                    Prompt = conversationLog.Prompt,
+                    Completion = conversationLog.Completion,
+                    PromptImages = conversationLog.PromptImages.Select(p => p.Clone()).ToList(),
+                    CompletionImages = conversationLog.CompletionImages.Select(p => p.Clone()).ToList()
+                });
+            }
 
             // Add prompt to request prompt
             sb.Append($"{config.Username}: {prompt}\n\n");
@@ -100,7 +112,7 @@ namespace Textgen
             }
         }
 
-        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, LlamaConfig config, string system, string model, string prompt, List<(string, string)> history)
+        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, LlamaConfig config, string system, string model, string prompt, List<ConversationTurn> history)
         {
             using (var stream = await response.Content.ReadAsStreamAsync())
             using (var reader = new StreamReader(stream))

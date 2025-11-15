@@ -266,12 +266,12 @@ namespace Textgen
                 return 1;
             }
 
-            PromptSet promptSet = PromptSet.Create(prompt);
+            PromptSequence promptSequence = PromptSequenceBuilder.FromString(prompt);
             OutputResult outputResult = conversationLog;
-            foreach (var input in promptSet.Prompts)
+            foreach (var message in promptSequence.Messages)
             {
                 outputResult = await textGenerator.GenerateTextAsync(
-                    model, input, system, config, outputResult, cancellationToken);
+                    model, message.Text, system, config, outputResult, cancellationToken);
                 Console.WriteLine(outputResult.Completion);
             }
 
@@ -340,10 +340,16 @@ namespace Textgen
 
             Console.WriteLine("Conversation mode started (ends with exit/quit, also ends with Ctrl+C)\n");
 
-            foreach (var (p, c) in conversation.History)
+            foreach (var entry in conversation.History)
             {
-                Console.WriteLine($"{userLabel}: {p}");
-                Console.WriteLine($"{assistantLabel}: {c}");
+                if (!string.IsNullOrEmpty(entry.Prompt))
+                {
+                    Console.WriteLine($"{userLabel}: {entry.Prompt}");
+                }
+                if (!string.IsNullOrEmpty(entry.Completion))
+                {
+                    Console.WriteLine($"{assistantLabel}: {entry.Completion}");
+                }
             }
             if (!string.IsNullOrEmpty(conversation.Prompt) || !string.IsNullOrEmpty(conversation.Completion))
             {

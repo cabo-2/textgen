@@ -1,18 +1,26 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
+
+#nullable enable
 
 namespace Textgen
 {
     public class OutputResult
     {
-        public string Date { get; set; }
-        public string Host { get; set; }
-        public string Model { get; set; }
-        public IConfig Config { get; set; }
-        public string System { get; set; }
-        public string Prompt { get; set; }
-        public string Completion { get; set; }
-        public List<(string Prompt, string Completion)> History { get; set; } = new List<(string, string)>();
+        public string? Date { get; set; }
+        public string? Host { get; set; }
+        public string? Model { get; set; }
+        public IConfig? Config { get; set; }
+        public string? System { get; set; }
+        public string? Prompt { get; set; }
+        public string? Completion { get; set; }
+        public List<ImageAttachment> PromptImages { get; set; } = new();
+        public List<ImageAttachment> CompletionImages { get; set; } = new();
+        public List<ConversationTurn> History { get; set; } = new();
 
         public string Format(string format)
         {
@@ -21,33 +29,37 @@ namespace Textgen
                 case "json":
                     return JsonConvert.SerializeObject(this, Formatting.Indented);
 
-                default: // text
+                default:
                     var sb = new StringBuilder();
-                    sb.Append($"@date\n{Date}\n\n");
-                    sb.Append($"@host\n{Host}\n\n");
-                    sb.Append($"@model\n{Model}\n\n");
+                    sb.Append($"@date\n{Date ?? string.Empty}\n\n");
+                    sb.Append($"@host\n{Host ?? string.Empty}\n\n");
+                    sb.Append($"@model\n{Model ?? string.Empty}\n\n");
                     sb.Append("@config\n");
                     if (Config != null)
                     {
                         sb.Append(Config.FormatConfig());
                     }
                     sb.Append("\n");
-                    sb.Append($"@system\n{System}\n\n");
+                    sb.Append($"@system\n{System ?? string.Empty}\n\n");
 
                     if (History.Count > 0)
                     {
                         for (int i = 0; i < History.Count; i++)
                         {
                             var history = History[i];
-                            sb.Append($"@history-prompt_{i + 1}\n{history.Prompt}\n\n");
-                            sb.Append($"@history-completion_{i + 1}\n{history.Completion}\n\n");
+                            sb.Append($"@history-prompt_{i + 1}\n{history.Prompt ?? string.Empty}\n\n");
+                            AppendImageBlock(sb, $"history-prompt-images_{i + 1}", $"history_prompt_{i + 1}_image_", history.PromptImages);
+                            sb.Append($"@history-completion_{i + 1}\n{history.Completion ?? string.Empty}\n\n");
+                            AppendImageBlock(sb, $"history-completion-images_{i + 1}", $"history_completion_{i + 1}_image_", history.CompletionImages);
                         }
                     }
 
-                    sb.Append($"@prompt\n{Prompt}\n\n");
-                    sb.Append($"@completion\n{Completion}\n");
+                    sb.Append($"@prompt\n{Prompt ?? string.Empty}\n\n");
+                    AppendImageBlock(sb, "prompt-images", "prompt_image_", PromptImages);
+                    sb.Append($"@completion\n{Completion ?? string.Empty}\n\n");
+                    AppendImageBlock(sb, "completion-images", "completion_image_", CompletionImages);
 
-                    return sb.ToString();
+                    return sb.ToString().TrimEnd() + "\n";
             }
         }
 
@@ -59,12 +71,16 @@ namespace Textgen
             }
 
             var fileContent = await File.ReadAllTextAsync(filePath, cancellationToken);
-            return filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? LoadFromJson(fileContent) : LoadFromText(fileContent, defaultConfig);
+            var result = filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ? LoadFromJson(fileContent) : LoadFromText(fileContent, defaultConfig);
+            result.Normalize();
+            return result;
         }
 
         private static OutputResult LoadFromJson(string jsonContent)
         {
-            return JsonConvert.DeserializeObject<OutputResult>(jsonContent);
+            var output = JsonConvert.DeserializeObject<OutputResult>(jsonContent) ?? new OutputResult();
+            output.Normalize();
+            return output;
         }
 
         private static OutputResult LoadFromText(string textContent, IConfig defaultConfig)
@@ -72,8 +88,10 @@ namespace Textgen
             var lines = textContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             var result = new OutputResult();
 
-            Dictionary<int, string> prompts = new Dictionary<int, string>();
-            Dictionary<int, string> completions = new Dictionary<int, string>();
+            var historyPrompts = new Dictionary<int, string>();
+            var historyCompletions = new Dictionary<int, string>();
+            var historyPromptImages = new Dictionary<int, List<ImageAttachment>>();
+            var historyCompletionImages = new Dictionary<int, List<ImageAttachment>>();
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -81,84 +99,280 @@ namespace Textgen
 
                 if (line.StartsWith("@date"))
                 {
-                    result.Date = lines[++i];
+                    if (i + 1 < lines.Length)
+                        result.Date = lines[++i];
                 }
                 else if (line.StartsWith("@host"))
                 {
-                    result.Host = lines[++i];
+                    if (i + 1 < lines.Length)
+                        result.Host = lines[++i];
                 }
                 else if (line.StartsWith("@config"))
                 {
-                    StringBuilder configText = new StringBuilder();
-                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
-                    {
-                        configText.AppendLine(lines[++i]);
-                    }
-                    result.Config = defaultConfig.LoadFromText(configText.ToString());
+                    var configText = ReadBlock(lines, ref i, trim: false);
+                    result.Config = defaultConfig.LoadFromText(configText);
                 }
                 else if (line.StartsWith("@model"))
                 {
-                    result.Model = lines[++i];
+                    if (i + 1 < lines.Length)
+                        result.Model = lines[++i];
                 }
                 else if (line.StartsWith("@system"))
                 {
-                    StringBuilder systemText = new StringBuilder();
-                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
-                    {
-                        systemText.AppendLine(lines[++i]);
-                    }
-                    result.System = systemText.ToString().Trim();
+                    result.System = ReadBlock(lines, ref i, trim: true);
+                }
+                else if (line.StartsWith("@history-prompt-images_"))
+                {
+                    var index = ParseTrailingIndex(line, "@history-prompt-images_");
+                    var blockLines = ReadBlockLines(lines, ref i);
+                    historyPromptImages[index] = ParseAttachmentBlock(blockLines, $"history_prompt_{index}_image_");
+                }
+                else if (line.StartsWith("@history-completion-images_"))
+                {
+                    var index = ParseTrailingIndex(line, "@history-completion-images_");
+                    var blockLines = ReadBlockLines(lines, ref i);
+                    historyCompletionImages[index] = ParseAttachmentBlock(blockLines, $"history_completion_{index}_image_");
                 }
                 else if (line.StartsWith("@history-prompt"))
                 {
                     var index = int.Parse(line.Split('_')[1]);
-                    StringBuilder promptText = new StringBuilder();
-                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
-                    {
-                        promptText.AppendLine(lines[++i]);
-                    }
-                    prompts[index] = promptText.ToString().Trim();
+                    historyPrompts[index] = ReadBlock(lines, ref i, trim: true);
                 }
                 else if (line.StartsWith("@history-completion"))
                 {
                     var index = int.Parse(line.Split('_')[1]);
-                    StringBuilder completionText = new StringBuilder();
-                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
-                    {
-                        completionText.AppendLine(lines[++i]);
-                    }
-                    completions[index] = completionText.ToString().Trim();
+                    historyCompletions[index] = ReadBlock(lines, ref i, trim: true);
+                }
+                else if (line.StartsWith("@prompt-images"))
+                {
+                    var blockLines = ReadBlockLines(lines, ref i);
+                    result.PromptImages = ParseAttachmentBlock(blockLines, "prompt_image_");
+                }
+                else if (line.StartsWith("@completion-images"))
+                {
+                    var blockLines = ReadBlockLines(lines, ref i);
+                    result.CompletionImages = ParseAttachmentBlock(blockLines, "completion_image_");
                 }
                 else if (line.StartsWith("@prompt"))
                 {
-                    StringBuilder promptText = new StringBuilder();
-                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
-                    {
-                        promptText.AppendLine(lines[++i]);
-                    }
-                    result.Prompt = promptText.ToString().Trim();
+                    result.Prompt = ReadBlock(lines, ref i, trim: true);
                 }
                 else if (line.StartsWith("@completion"))
                 {
-                    StringBuilder completionText = new StringBuilder();
-                    while (i + 1 < lines.Length && !lines[i + 1].StartsWith("@"))
-                    {
-                        completionText.AppendLine(lines[++i]);
-                    }
-                    result.Completion = completionText.ToString().Trim();
+                    result.Completion = ReadBlock(lines, ref i, trim: true);
                 }
             }
 
-            // Merge prompts and completions
-            var maxIndex = Math.Max(prompts.Count > 0 ? prompts.Keys.Max() : 0, completions.Count > 0 ? completions.Keys.Max() : 0);
+            var maxIndex = new[]
+            {
+                historyPrompts.Keys.DefaultIfEmpty(0).Max(),
+                historyCompletions.Keys.DefaultIfEmpty(0).Max(),
+                historyPromptImages.Keys.DefaultIfEmpty(0).Max(),
+                historyCompletionImages.Keys.DefaultIfEmpty(0).Max()
+            }.Max();
+
             for (int j = 1; j <= maxIndex; j++)
             {
-                string prompt = prompts.ContainsKey(j) ? prompts[j] : null;
-                string completion = completions.ContainsKey(j) ? completions[j] : null;
-                result.History.Add((prompt, completion));
+                historyPrompts.TryGetValue(j, out var prompt);
+                historyCompletions.TryGetValue(j, out var completion);
+                historyPromptImages.TryGetValue(j, out var promptImages);
+                historyCompletionImages.TryGetValue(j, out var completionImages);
+
+                var entry = new ConversationTurn
+                {
+                    Prompt = prompt,
+                    Completion = completion,
+                    PromptImages = promptImages ?? new List<ImageAttachment>(),
+                    CompletionImages = completionImages ?? new List<ImageAttachment>()
+                };
+
+                if (entry.HasContent)
+                {
+                    result.History.Add(entry);
+                }
             }
 
+            result.Normalize();
             return result;
+        }
+
+        private static string ReadBlock(string[] lines, ref int index, bool trim)
+        {
+            var builder = new StringBuilder();
+            while (index + 1 < lines.Length && !lines[index + 1].StartsWith("@"))
+            {
+                builder.AppendLine(lines[++index]);
+            }
+
+            return trim ? builder.ToString().Trim() : builder.ToString();
+        }
+
+        private static List<string> ReadBlockLines(string[] lines, ref int index)
+        {
+            var list = new List<string>();
+            while (index + 1 < lines.Length && !lines[index + 1].StartsWith("@"))
+            {
+                list.Add(lines[++index]);
+            }
+            return list;
+        }
+
+        private static List<ImageAttachment> ParseAttachmentBlock(List<string> blockLines, string keyPrefix)
+        {
+            var attachments = new SortedDictionary<int, ImageAttachment>();
+            foreach (var rawLine in blockLines)
+            {
+                if (string.IsNullOrWhiteSpace(rawLine))
+                {
+                    continue;
+                }
+
+                var trimmed = rawLine.Trim();
+                if (trimmed.StartsWith("count=", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var separatorIndex = trimmed.IndexOf('=');
+                if (separatorIndex < 0)
+                {
+                    continue;
+                }
+
+                var key = trimmed.Substring(0, separatorIndex);
+                var value = trimmed.Substring(separatorIndex + 1);
+
+                if (!key.StartsWith(keyPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var remainder = key.Substring(keyPrefix.Length);
+                var underscoreIndex = remainder.IndexOf('_');
+                if (underscoreIndex < 0)
+                {
+                    continue;
+                }
+
+                var indexPart = remainder.Substring(0, underscoreIndex);
+                if (!int.TryParse(indexPart, out var attachmentIndex))
+                {
+                    continue;
+                }
+
+                var field = remainder.Substring(underscoreIndex + 1);
+                if (!attachments.TryGetValue(attachmentIndex, out var attachment))
+                {
+                    attachment = new ImageAttachment();
+                    attachments[attachmentIndex] = attachment;
+                }
+
+                ApplyAttachmentField(attachment, field, value);
+            }
+
+            return attachments
+                .OrderBy(kvp => kvp.Key)
+                .Select(kvp => kvp.Value)
+                .ToList();
+        }
+
+        private static void ApplyAttachmentField(ImageAttachment attachment, string field, string value)
+        {
+            switch (field)
+            {
+                case "path":
+                    attachment.StoredPath = value;
+                    if (string.IsNullOrEmpty(attachment.FileName))
+                    {
+                        attachment.FileName = Path.GetFileName(value);
+                    }
+                    break;
+                case "original_path":
+                    attachment.SourcePath = value;
+                    break;
+                case "sha256":
+                    attachment.Sha256 = value;
+                    break;
+                case "mime":
+                    attachment.MimeType = value;
+                    break;
+                case "size_bytes":
+                    if (long.TryParse(value, out var size))
+                    {
+                        attachment.SizeBytes = size;
+                    }
+                    break;
+                case "caption":
+                    attachment.Caption = value;
+                    break;
+            }
+        }
+
+        private static int ParseTrailingIndex(string line, string prefix)
+        {
+            var value = line.Substring(prefix.Length);
+            if (!int.TryParse(value, out var index))
+            {
+                throw new FormatException($"Invalid attachment block header: {line}");
+            }
+
+            return index;
+        }
+
+        private static void AppendImageBlock(StringBuilder sb, string blockName, string keyPrefix, IReadOnlyList<ImageAttachment> attachments)
+        {
+            if (attachments == null || attachments.Count == 0)
+            {
+                return;
+            }
+
+            sb.Append($"@{blockName}\n");
+            sb.Append($"count={attachments.Count}\n");
+            for (int i = 0; i < attachments.Count; i++)
+            {
+                var attachment = attachments[i];
+                var prefix = $"{keyPrefix}{i + 1}_";
+                sb.Append($"{prefix}path={attachment.StoredPath ?? attachment.SourcePath ?? attachment.FileName ?? string.Empty}\n");
+                if (!string.IsNullOrEmpty(attachment.SourcePath))
+                {
+                    sb.Append($"{prefix}original_path={attachment.SourcePath}\n");
+                }
+                if (!string.IsNullOrEmpty(attachment.Sha256))
+                {
+                    sb.Append($"{prefix}sha256={attachment.Sha256}\n");
+                }
+                if (!string.IsNullOrEmpty(attachment.MimeType))
+                {
+                    sb.Append($"{prefix}mime={attachment.MimeType}\n");
+                }
+                if (attachment.SizeBytes.HasValue)
+                {
+                    sb.Append($"{prefix}size_bytes={attachment.SizeBytes.Value}\n");
+                }
+                if (!string.IsNullOrEmpty(attachment.Caption))
+                {
+                    sb.Append($"{prefix}caption={attachment.Caption}\n");
+                }
+            }
+            sb.Append("\n");
+        }
+
+        private void Normalize()
+        {
+            PromptImages ??= new List<ImageAttachment>();
+            CompletionImages ??= new List<ImageAttachment>();
+            History ??= new List<ConversationTurn>();
+
+            foreach (var turn in History)
+            {
+                if (turn == null)
+                {
+                    continue;
+                }
+
+                turn.PromptImages ??= new List<ImageAttachment>();
+                turn.CompletionImages ??= new List<ImageAttachment>();
+            }
         }
     }
 }
