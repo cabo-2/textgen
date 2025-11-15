@@ -8,7 +8,7 @@
 ## 2. Goals
 1. Provide a minimal CLI UX for attaching images to a request without forcing users to hand-edit JSON payloads.
 2. Allow model/provider-specific configuration of image encoding and transport (inline base64 vs. remote URL reference).
-3. Keep the TextGenerator abstraction provider-agnostic by introducing a `VisionRequest` shape that each provider implementation can translate as needed.
+3. Keep the TextGenerator abstraction provider-agnostic by introducing a `GenerationRequest` shape that each provider implementation can translate as needed.
 4. Ensure deterministic, reproducible runs via explicit image ordering and metadata captured in logs/output.
 
 ## 3. Non-Goals
@@ -44,7 +44,7 @@ Update README usage table and `--help` output with descriptions and caveats (sup
 ## 7. Internal Data Model
 ### 7.1 New Types
 ```csharp
-public record VisionRequest(
+public record GenerationRequest(
     IReadOnlyList<ImageAttachment> Images,
     string? Prompt,
     string? SystemPrompt,
@@ -63,7 +63,7 @@ public record ImageAttachment(
 
 ### 7.2 Factory Changes
 - `TextGeneratorFactory` detects presence of `ImageAttachment`s and chooses a provider implementation that advertises `SupportsVision`.
-- Introduce `IVisionCapableModelProvider` interface exposing `Task<OutputResult> GenerateAsync(VisionRequest request, CancellationToken token)`.
+- Introduce `IVisionCapableModelProvider` interface exposing `Task<OutputResult> GenerateAsync(GenerationRequest request, CancellationToken token)`.
 - Backwards compatibility: existing text-only flow remains untouched; if model does not support vision and images are present, throw with suggestion.
 
 ## 8. Provider Responsibilities
@@ -79,10 +79,15 @@ public record ImageAttachment(
 - Determine whether currently loaded model exposes `vision` capability; require the server flag `--vision` or error.
 - Use existing `/v1/chat/completions` compatibility layer; encode images base64 in `image_url` entries if server accepts.
 
+### 8.4 API compatibility
+- **OpenAI `/v1/chat/completions`**: `GenerationRequest` sequences become the `messages` array already expected by the API, adding `{"type":"input_image"}` segments only when attachments exist, so text-only runs remain identical to current payloads.
+- **Google Gemini**: The same request surface is translated into `generateContent` calls with `inlineData` for each attachment, mirroring Gemini’s multimodal contract.
+- **llama.cpp `/completion`**: When targeting local servers that only expose `/completion`, the adapter collapses each prompt+attachment set into the existing `prompt` / `images` form (base64 data in the compatibility layer). Text-only prompts keep flowing through unchanged, ensuring parity with legacy LLAMA runs.
 ## 9. Output & Logging
 - `OutputResult` gains `IReadOnlyList<ImageAttachmentMetadata>` to echo attachments (without base64 payload) in textual/JSON outputs. Each item tracks `Role` (`prompt`, `assistant`, `system`, `history_prompt_X`, etc.), canonical path within the run directory (e.g., `images/img_01_receipt.png`), original filename, MIME, size, SHA256, optional caption.
 - Conversation logs store message array including references like `image://sha256/<hash>` to avoid bloating log files.
 - Standard file output remains either plain text (assistant content only) or JSON (includes attachments metadata, provider response headers, usage stats).
+- Attachment files are persisted using their original names (user-provided path basename or provider-returned filename) inside the run’s `images/` directory; collisions resolved by appending a disambiguating suffix but the default is a 1:1 mapping so humans can trace artifacts back to source assets.
 
 ### 9.1 Text output sections
 - Prompt-side attachments follow a dedicated block immediately after `@prompt`:
