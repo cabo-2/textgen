@@ -5,12 +5,7 @@ namespace Textgen
 {
     public class Program
     {
-        // Kept static for env lookup convenience
-        private static string openAIHost =
-            Environment.GetEnvironmentVariable("OPENAI_API_HOST")
-            ?? "http://localhost:8081/completion";
-        private static readonly string apiKey =
-            Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        private const string DefaultApiHost = "http://localhost:8081/completion";
 
         static async Task<int> Main(string[] args)
         {
@@ -64,14 +59,21 @@ namespace Textgen
                 if (logger != null) inner = new LoggingHandler(inner, logger);
                 var httpClient = new HttpClient(inner) { Timeout = Timeout.InfiniteTimeSpan };
 
-                var apiEndpoint = openAIHost.GetApiEndpoint();
+                var apiHost = ResolveApiHost(out var usedLegacyHostEnv);
+                if (usedLegacyHostEnv)
+                {
+                    LogWarning(logger, "OPENAI_API_HOST is deprecated; please migrate to TEXTGEN_API_HOST.");
+                }
+
+                var apiKey = ResolveApiKey(apiHost, logger);
+                var apiEndpoint = apiHost.GetApiEndpoint();
 
                 if (!string.IsNullOrEmpty(apiKey) && apiEndpoint != ApiEndpoint.Gemini)
                     httpClient.DefaultRequestHeaders.Authorization =
                         new AuthenticationHeaderValue("Bearer", apiKey);
 
                 var cacheOptions = new CacheActionOptions(restoreCacheOption.Value(), saveCacheOption.Value());
-                var isOfficialOpenAiHost = openAIHost.IsOfficialOpenAiHost();
+                var isOfficialOpenAiHost = apiHost.IsOfficialOpenAiHost();
 
                 if (restoreCacheOption.HasValue() && string.IsNullOrWhiteSpace(cacheOptions.RestoreFile))
                 {
@@ -107,7 +109,7 @@ namespace Textgen
                 // If query option is specified, handle it and exit
                 if (queryOption.HasValue())
                 {
-                    var provider = TextGeneratorFactory.CreateModelProvider(openAIHost, httpClient, apiKey, logger);
+                    var provider = TextGeneratorFactory.CreateModelProvider(apiHost, httpClient, apiKey, logger);
                     if (provider == null)
                     {
                         Console.WriteLine("Unsupported endpoint.");
@@ -150,7 +152,7 @@ namespace Textgen
                 }
 
                 // Determine the text generator and configuration to use
-                var textGenerator = TextGeneratorFactory.CreateGenerator(openAIHost, httpClient, apiKey, logger);
+                var textGenerator = TextGeneratorFactory.CreateGenerator(apiHost, httpClient, apiKey, logger);
                 if (textGenerator == null)
                     return 1;
 
@@ -159,7 +161,7 @@ namespace Textgen
                 // Load parameters from config file if specified
                 var config = await defaultConfig.LoadConfigAsync(configFile, cancellationToken);
 
-                var cacheCoordinator = CacheActionCoordinatorFactory.Create(apiEndpoint, openAIHost, httpClient, cacheOptions, logger);
+                var cacheCoordinator = CacheActionCoordinatorFactory.Create(apiEndpoint, apiHost, httpClient, cacheOptions, logger);
 
                 try
                 {
@@ -446,6 +448,79 @@ namespace Textgen
             }
 
             return 0;
+        }
+
+        private static string ResolveApiHost(out bool usedLegacyHostEnv)
+        {
+            var primary = Environment.GetEnvironmentVariable("TEXTGEN_API_HOST");
+            if (!string.IsNullOrWhiteSpace(primary))
+            {
+                usedLegacyHostEnv = false;
+                return primary;
+            }
+
+            var legacy = Environment.GetEnvironmentVariable("OPENAI_API_HOST");
+            if (!string.IsNullOrWhiteSpace(legacy))
+            {
+                usedLegacyHostEnv = true;
+                return legacy;
+            }
+
+            usedLegacyHostEnv = false;
+            return DefaultApiHost;
+        }
+
+        private static string ResolveApiKey(string apiHost, ILogger logger)
+        {
+            if (string.IsNullOrWhiteSpace(apiHost))
+                return null;
+
+            var apiEndpoint = apiHost.GetApiEndpoint();
+            var isOfficialOpenAiHost = apiHost.IsOfficialOpenAiHost();
+
+            switch (apiEndpoint)
+            {
+                case ApiEndpoint.Gemini:
+                    var geminiKey = Environment.GetEnvironmentVariable("GEMINI_API_KEY");
+                    if (string.IsNullOrWhiteSpace(geminiKey))
+                    {
+                        LogWarning(logger, "GEMINI_API_KEY is not set. Gemini endpoints require GEMINI_API_KEY.");
+                    }
+                    return geminiKey;
+
+                case ApiEndpoint.OpenAi:
+                    if (isOfficialOpenAiHost)
+                    {
+                        return Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+                    }
+
+                    var llamaKeyForOpenAiCompatible = Environment.GetEnvironmentVariable("LLAMA_API_KEY");
+                    if (string.IsNullOrWhiteSpace(llamaKeyForOpenAiCompatible))
+                    {
+                        LogWarning(logger, "LLAMA_API_KEY is not set. Non-OpenAI hosts using OpenAI-compatible endpoints will send requests without an API key.");
+                    }
+                    return llamaKeyForOpenAiCompatible;
+
+                case ApiEndpoint.Llama:
+                    var llamaKey = Environment.GetEnvironmentVariable("LLAMA_API_KEY");
+                    if (string.IsNullOrWhiteSpace(llamaKey))
+                    {
+                        LogWarning(logger, "LLAMA_API_KEY is not set. Requests to llama.cpp hosts will be sent without an API key.");
+                    }
+                    return llamaKey;
+
+                default:
+                    return null;
+            }
+        }
+
+        private static void LogWarning(ILogger logger, string message)
+        {
+            logger?.Log($"Warning: {message}");
+            if (logger == null)
+            {
+                Console.Error.WriteLine($"Warning: {message}");
+            }
         }
 
         private static bool TryBuildAttachments(IReadOnlyList<string> imagePaths, out List<ImageAttachment> attachments)

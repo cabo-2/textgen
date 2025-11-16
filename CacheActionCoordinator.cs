@@ -90,7 +90,7 @@ namespace Textgen
         private string BuildCacheActionUrl(string action)
         {
             if (!Uri.TryCreate(_apiHost, UriKind.Absolute, out var apiUri))
-                throw new InvalidOperationException("OPENAI_API_HOST must be an absolute URI to use cache actions.");
+                throw new InvalidOperationException("TEXTGEN_API_HOST must be an absolute URI to use cache actions.");
 
             var builder = new UriBuilder(apiUri)
             {
@@ -102,4 +102,3 @@ namespace Textgen
         }
     }
 }
-

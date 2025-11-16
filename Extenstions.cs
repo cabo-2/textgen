@@ -20,18 +20,26 @@ namespace Textgen
     {
         public static ApiEndpoint GetApiEndpoint(this string apiHost)
         {
-            if (apiHost.EndsWith("/completion"))
+            if (string.IsNullOrWhiteSpace(apiHost))
             {
-                return ApiEndpoint.Llama;
+                return ApiEndpoint.Unsupported;
             }
-            if (apiHost.EndsWith("/v1/chat/completions"))
-            {
-                return ApiEndpoint.OpenAi;
-            }
-            if (apiHost == "https://generativelanguage.googleapis.com/v1beta/models")
+
+            if (apiHost.IsGeminiHost())
             {
                 return ApiEndpoint.Gemini;
             }
+
+            if (apiHost.EndsWith("/completion", StringComparison.OrdinalIgnoreCase))
+            {
+                return ApiEndpoint.Llama;
+            }
+            if (apiHost.Contains("/v1/chat/completions", StringComparison.OrdinalIgnoreCase)
+                || apiHost.Contains("/v1/completions", StringComparison.OrdinalIgnoreCase))
+            {
+                return ApiEndpoint.OpenAi;
+            }
+
             return ApiEndpoint.Unsupported;
         }
 
@@ -48,6 +56,14 @@ namespace Textgen
                 authority += "/";
 
             return string.Equals(authority, "https://api.openai.com/", StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static bool IsGeminiHost(this string apiHost)
+        {
+            if (!Uri.TryCreate(apiHost, UriKind.Absolute, out var uri))
+                return false;
+
+            return uri.Host.EndsWith("generativelanguage.googleapis.com", StringComparison.OrdinalIgnoreCase);
         }
     }
 

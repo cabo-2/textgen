@@ -79,12 +79,22 @@ Options
 
 ### Set API configurations
 
-Ensure environment variables OPENAI_API_HOST and OPENAI_API_KEY are set.
+Use `TEXTGEN_API_HOST` as the primary endpoint selector. For backward compatibility, `OPENAI_API_HOST` is still read when `TEXTGEN_API_HOST` is missing, but the application will emit a warning so you can migrate.
+
+API keys:
+- `OPENAI_API_KEY`: Only for OpenAI endpoints.
+- `GEMINI_API_KEY`: For Gemini endpoints.
+- `LLAMA_API_KEY`: For llama.cpp or other generic OpenAI-compatible endpoints.
+
+The key is chosen automatically based on the host:
+- OpenAI hosts -> `OPENAI_API_KEY`
+- Google Gemini hosts -> `GEMINI_API_KEY`
+- Other OpenAI-compatible hosts -> `LLAMA_API_KEY`
 
 Example:
 ```bash
-export OPENAI_API_HOST="http://localhost:8081/completion"
-export OPENAI_API_KEY="your_api_key"
+export TEXTGEN_API_HOST="http://localhost:8081/completion"
+export LLAMA_API_KEY="your_api_key"
 ```
 
 - *For llama.cpp server, API keys are not required.*
@@ -98,8 +108,8 @@ Use this endpoint for basic text completion tasks.
 
 Example usage:
 ```bash
-export OPENAI_API_HOST="http://localhost:8081/completion"
-export OPENAI_API_KEY="no-key"
+export TEXTGEN_API_HOST="http://localhost:8081/completion"
+export LLAMA_API_KEY="no-key"
 
 dotnet run -- -m gemma-27b -p "What is the capital of France?" -o ~/output.txt
 ```
@@ -132,7 +142,7 @@ Chat models like gpt-4o-mini can be accessed here.
 
 Example usage:
 ```bash
-export OPENAI_API_HOST="https://api.openai.com/v1/chat/completions"
+export TEXTGEN_API_HOST="https://api.openai.com/v1/chat/completions"
 export OPENAI_API_KEY="YOUR_OPENAI_API_KEY"
 
 dotnet run -- -m gpt-4o-mini -p "Show me a code snippet of a website's sticky header in CSS and JavaScript." -o ~/output.txt
@@ -157,8 +167,8 @@ Utilize this endpoint for accessing [Google's Gemini API](https://ai.google.dev/
 
 Example usage:
 ```bash
-export OPENAI_API_HOST="https://generativelanguage.googleapis.com/v1beta/models"
-export OPENAI_API_KEY="YOUR_GEMINI_API_KEY"
+export TEXTGEN_API_HOST="https://generativelanguage.googleapis.com/v1beta/models"
+export GEMINI_API_KEY="YOUR_GEMINI_API_KEY"
 
 dotnet run -- -m gemini-1.5-flash -p "Write a story about a magic backpack." -o ~/output.txt
 ```
