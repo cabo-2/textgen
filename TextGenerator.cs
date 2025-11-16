@@ -1,15 +1,18 @@
+﻿#nullable enable
+using System;
+
 namespace Textgen
 {
     public abstract class TextGenerator
     {
         protected readonly HttpClient _httpClient;
         protected readonly string _apiHost;
-        protected readonly ILogger _logger;
+        protected readonly ILogger? _logger;
 
-        public TextGenerator(HttpClient httpClient, string apiHost, ILogger logger = null)
+        public TextGenerator(HttpClient httpClient, string apiHost, ILogger? logger = null)
         {
-            _httpClient = httpClient;
-            _apiHost = apiHost;
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+            _apiHost = apiHost ?? throw new ArgumentNullException(nameof(apiHost));
             _logger = logger;
         }
 

@@ -1,3 +1,4 @@
+﻿#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -9,12 +10,13 @@ namespace Textgen
 {
     public class LlamaTextGenerator : TextGenerator
     {
-        public LlamaTextGenerator(HttpClient httpClient, string apiHost, ILogger logger = null) : base(httpClient, apiHost, logger)
+        public LlamaTextGenerator(HttpClient httpClient, string apiHost, ILogger? logger = null) : base(httpClient, apiHost, logger)
         { }
 
         public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<ImageAttachment>? promptImages = null, CancellationToken cancellationToken = default)
         {
-            LlamaConfig config = conf as LlamaConfig;
+            if (conf is not LlamaConfig config)
+                throw new ArgumentException("Expected LlamaConfig", nameof(conf));
 
             StringBuilder sb = new StringBuilder();
             var history = new List<ConversationTurn>();
@@ -103,7 +105,8 @@ namespace Textgen
             else
             {
                 var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
-                dynamic result = JsonConvert.DeserializeObject(jsonResponse);
+                dynamic result = JsonConvert.DeserializeObject(jsonResponse) ?? throw new InvalidOperationException("Empty response from llama.cpp endpoint.");
+                var completion = (string?)result.content ?? string.Empty;
 
                 return new OutputResult
                 {
@@ -115,7 +118,7 @@ namespace Textgen
                     History = history,
                     Prompt = (prompt ?? string.Empty).Trim(),
                     PromptImages = promptImageList.Select(p => p.Clone()).ToList(),
-                    Completion = result.content.ToString().Trim()
+                    Completion = completion.Trim()
                 };
             }
         }
@@ -127,7 +130,7 @@ namespace Textgen
             {
                 var completionText = new StringBuilder();
                 string stopSequence = $"{config.Username}:";
-                string line;
+                string? line;
 
                 while ((line = await reader.ReadLineAsync()) != null)
                 {
@@ -138,8 +141,13 @@ namespace Textgen
 
                         if (!string.IsNullOrEmpty(line))
                         {
-                            dynamic result = JsonConvert.DeserializeObject(line);
-                            string content = result.content;
+                            dynamic? result = JsonConvert.DeserializeObject(line);
+                            if (result == null)
+                            {
+                                continue;
+                            }
+
+                            var content = (string?)result?.content;
 
                             if (!string.IsNullOrEmpty(content))
                             {

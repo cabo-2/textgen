@@ -1,3 +1,4 @@
+﻿#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,14 +12,15 @@ namespace Textgen
     {
         private readonly string _apiKey;
 
-        public GeminiTextGenerator(HttpClient httpClient, string apiHost, string apiKey, ILogger logger = null) : base(httpClient, apiHost, logger)
+        public GeminiTextGenerator(HttpClient httpClient, string apiHost, string apiKey, ILogger? logger = null) : base(httpClient, apiHost, logger)
         {
-            _apiKey = apiKey;
+            _apiKey = apiKey ?? throw new ArgumentNullException(nameof(apiKey));
         }
 
         public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<ImageAttachment>? promptImages = null, CancellationToken cancellationToken = default)
         {
-            GeminiConfig config = (GeminiConfig)conf;
+            if (conf is not GeminiConfig config)
+                throw new ArgumentException("Expected GeminiConfig", nameof(conf));
 
             var history = new List<ConversationTurn>();
             var promptImageList = promptImages?.ToList() ?? new List<ImageAttachment>();
@@ -119,9 +121,9 @@ namespace Textgen
             response.EnsureSuccessStatusCode();
 
             var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
-            dynamic result = JsonConvert.DeserializeObject(jsonResponse);
+            dynamic result = JsonConvert.DeserializeObject(jsonResponse) ?? throw new InvalidOperationException("Empty response from Gemini endpoint.");
 
-            var completion = result.candidates[0].content.parts[0].text.ToString().Trim();
+            var completion = ((string?)result?.candidates?[0]?.content?.parts?[0]?.text ?? string.Empty).Trim();
 
             return new OutputResult
             {

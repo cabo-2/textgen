@@ -1,3 +1,4 @@
+﻿#nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -12,12 +13,13 @@ namespace Textgen
         private const string UserRole = "user";
         private const string AssistantRole = "assistant";
 
-        public OpenAiTextGenerator(HttpClient httpClient, string apiHost, ILogger logger = null) : base(httpClient, apiHost, logger)
+        public OpenAiTextGenerator(HttpClient httpClient, string apiHost, ILogger? logger = null) : base(httpClient, apiHost, logger)
         { }
 
         public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<ImageAttachment>? promptImages = null, CancellationToken cancellationToken = default)
         {
-            OpenAiConfig config = (OpenAiConfig)conf;
+            if (conf is not OpenAiConfig config)
+                throw new ArgumentException("Expected OpenAiConfig", nameof(conf));
 
             var history = new List<ConversationTurn>();
             var promptImageList = promptImages?.ToList() ?? new List<ImageAttachment>();
@@ -88,7 +90,8 @@ namespace Textgen
             else
             {
                 var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
-                dynamic result = JsonConvert.DeserializeObject(jsonResponse);
+                dynamic result = JsonConvert.DeserializeObject(jsonResponse) ?? throw new InvalidOperationException("Empty response from OpenAI endpoint.");
+                var completion = (string?)result?.choices?[0]?.message?.content ?? string.Empty;
 
                 return new OutputResult
                 {
@@ -100,7 +103,7 @@ namespace Textgen
                     History = history,
                     Prompt = (prompt ?? string.Empty).Trim(),
                     PromptImages = promptImageList.Select(p => p.Clone()).ToList(),
-                    Completion = result.choices[0].message.content.ToString().Trim()
+                    Completion = completion.Trim()
                 };
             }
         }
@@ -111,7 +114,7 @@ namespace Textgen
             using (var reader = new StreamReader(stream))
             {
                 var completionText = new StringBuilder();
-                string line;
+                string? line;
                 while ((line = await reader.ReadLineAsync()) != null)
                 {
                     if (line.StartsWith("data:"))
@@ -121,16 +124,22 @@ namespace Textgen
 
                         if (!string.IsNullOrWhiteSpace(line) && line != "[DONE]")
                         {
-                            dynamic result = JsonConvert.DeserializeObject(line);
-                            string content;
+                            dynamic? result = JsonConvert.DeserializeObject(line);
+                            if (result == null)
+                            {
+                                continue;
+                            }
+
+                            string? content = null;
                             try
                             {
-                                content = result.choices[0].delta?.content;
+                                content = result?.choices?[0]?.delta?.content;
                             }
-                            catch(ArgumentOutOfRangeException)
+                            catch (ArgumentOutOfRangeException)
                             {
                                 content = null;
                             }
+
                             if (!string.IsNullOrEmpty(content))
                             {
                                 completionText.Append(content);
