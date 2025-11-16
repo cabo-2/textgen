@@ -26,7 +26,6 @@
 ### 5.1 New Arguments
 - `-I|--image <PATH>`: Add one image file. Repeatable.
 - `--image-dir <DIR>`: Include all images in directory (non-recursive by default; `--recursive` flag already exists? if not, add `--image-recursive`).
-- `--image-format <inline|url>`: Force encoding. Default provider-specific.
 - `--image-max-pixels <INT>`: Soft limit for warning/logging; actual resizing out-of-scope but value stored for future enforcement.
 - `--vision-only`: Skip textual prompt; provider receives only images plus optional system prompt.
 
@@ -69,7 +68,7 @@ public record ImageAttachment(
 ## 8. Provider Responsibilities
 ### 8.1 OpenAI-compatible
 - For `/v1/chat/completions` send messages array with `{"type":"input_text"}` + `{ "type":"input_image", "image_url": { "url": "data:image/png;base64,..." } }` segments ordered as provided.
-- Honor `--image-format url` by uploading to a user-provided HTTPS endpoint (out-of-scope). For now only `inline` supported; command should reject `url` for OpenAI unless future work adds presigned upload logic.
+- Only inline/base64 image payloads are supported in this phase; URL-based uploads are out-of-scope.
 
 ### 8.2 Gemini API
 - Call `models/{model}:generateContent` with `inlineData` blocks for images.
