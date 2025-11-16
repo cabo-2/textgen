@@ -1,0 +1,1 @@
+Write a short (<=60 words) announcement for a fictional CLI named "TextSight" that helps compare LLM outputs side by side.
