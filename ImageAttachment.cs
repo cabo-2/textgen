@@ -29,6 +29,12 @@ namespace Textgen
         public string? Sha256 { get; set; }
         public string? Caption { get; set; }
 
+        public static bool IsSupportedExtension(string path)
+        {
+            var extension = Path.GetExtension(path) ?? string.Empty;
+            return MimeTypeMap.ContainsKey(extension);
+        }
+
         public static ImageAttachment FromFile(string filePath, string? storedPath = null, string? caption = null)
         {
             if (string.IsNullOrWhiteSpace(filePath))

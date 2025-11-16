@@ -13,7 +13,7 @@ namespace Textgen
             _apiKey = apiKey;
         }
 
-        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
+        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<ImageAttachment>? promptImages = null, CancellationToken cancellationToken = default)
         {
             GeminiConfig config = (GeminiConfig)conf;
 

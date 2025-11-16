@@ -38,6 +38,8 @@ namespace Textgen
             conversationLogDirectoryOption.Accepts().ExistingDirectory();
             var restoreCacheOption = app.Option("-rc|--restore-cache <FNAME>", "Restore llama-server cache before sending chat messages.", CommandOptionType.SingleValue);
             var saveCacheOption = app.Option("-sc|--save-cache <FNAME>", "Save llama-server cache after sending chat messages.", CommandOptionType.SingleValue);
+            var imageOption = app.Option("-i|--image <FILE>", "Attach an image file (repeatable).", CommandOptionType.MultipleValue);
+            var visionOnlyOption = app.Option("--vision-only", "Send images without a text prompt.", CommandOptionType.NoValue);
             var queryOption = app.Option("-q|--query", "Query and list available model names.", CommandOptionType.NoValue);
             var debugOption = app.Option("-d|--debug:<FILE_PATH>", "Real-time API logging.  No value -> stderr.  File path -> append log file.", CommandOptionType.SingleOrNoValue);
 
@@ -137,6 +139,8 @@ namespace Textgen
                 string configFile = configOption.Value();
                 string conversationLogFile = conversationLogOption.Value();
                 string conversationLogDirectory = conversationLogDirectoryOption.Value();
+                var imagePaths = imageOption.Values ?? new List<string>();
+                bool visionOnly = visionOnlyOption.HasValue();
 
                 // Check for conflicting options
                 if (!string.IsNullOrEmpty(conversationLogDirectory) && (!string.IsNullOrEmpty(outputFile) || !string.IsNullOrEmpty(outputDirectory)))
@@ -212,6 +216,8 @@ namespace Textgen
                     outputDirectory,
                     conversationLogFile,
                     conversationLogDirectory,
+                    imagePaths,
+                    visionOnly,
                     cancellationToken);
 
                 if (exitCode == 0)
@@ -242,12 +248,14 @@ namespace Textgen
                 string promptFile,
                 string system,
                 string systemFile,
-                string format,
-                string outputFile,
-                string outputDirectory,
-                string convLogFile,
-                string convLogDir,
-                CancellationToken cancellationToken)
+            string format,
+            string outputFile,
+            string outputDirectory,
+            string convLogFile,
+            string convLogDir,
+            IReadOnlyList<string> imagePaths,
+            bool visionOnly,
+            CancellationToken cancellationToken)
         {
             // Load prompt from file if specified
             if (!string.IsNullOrEmpty(promptFile))
@@ -259,19 +267,54 @@ namespace Textgen
             // Load conversation history
             var conversationLog = await LogManager.LoadConversationAsync(convLogFile, convLogDir, defaultConfig, cancellationToken);
 
-            // Validate inputs
-            if (string.IsNullOrEmpty(model) || string.IsNullOrEmpty(prompt))
+            if (!TryBuildAttachments(imagePaths, out var promptAttachments))
             {
-                Console.WriteLine("Error: Model and prompt must be specified.");
                 return 1;
             }
 
-            PromptSequence promptSequence = PromptSequenceBuilder.FromString(prompt);
+            bool hasPrompt = !string.IsNullOrWhiteSpace(prompt);
+            bool hasImages = promptAttachments.Count > 0;
+
+            // Validate inputs
+            if (string.IsNullOrEmpty(model))
+            {
+                Console.WriteLine("Error: Model must be specified.");
+                return 1;
+            }
+
+            if (!hasPrompt)
+            {
+                if (!visionOnly)
+                {
+                    Console.WriteLine("Error: Prompt must be specified unless --vision-only is set.");
+                    return 1;
+                }
+
+                if (!hasImages)
+                {
+                    Console.WriteLine("Error: --vision-only requires at least one image.");
+                    return 1;
+                }
+            }
+
+            if (hasImages && textGenerator is not OpenAiTextGenerator)
+            {
+                Console.WriteLine("Error: Image attachments are currently supported only for OpenAI endpoints.");
+                return 1;
+            }
+
+            PromptSequence promptSequence = PromptSequenceBuilder.FromString(prompt, promptAttachments);
+            if (!promptSequence.IsValid)
+            {
+                Console.WriteLine("Error: No prompt content to process.");
+                return 1;
+            }
+
             OutputResult outputResult = conversationLog;
             foreach (var message in promptSequence.Messages)
             {
                 outputResult = await textGenerator.GenerateTextAsync(
-                    model, message.Text, system, config, outputResult, cancellationToken);
+                    model, message.Text, system, config, outputResult, message.Attachments, cancellationToken);
                 Console.WriteLine(outputResult.Completion);
             }
 
@@ -373,7 +416,7 @@ namespace Textgen
                 try
                 {
                     output = await textGenerator.GenerateTextAsync(
-                        model, input, system, config, conversation, cancellationToken);
+                        model, input, system, config, conversation, cancellationToken: cancellationToken);
                 }
                 catch (OperationCanceledException)
                 {
@@ -409,6 +452,62 @@ namespace Textgen
             }
 
             return 0;
+        }
+
+        private static bool TryBuildAttachments(IReadOnlyList<string> imagePaths, out List<ImageAttachment> attachments)
+        {
+            attachments = new List<ImageAttachment>();
+            if (imagePaths == null || imagePaths.Count == 0)
+            {
+                return true;
+            }
+
+            var errors = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var rawPath in imagePaths)
+            {
+                if (string.IsNullOrWhiteSpace(rawPath))
+                    continue;
+
+                var fullPath = Path.GetFullPath(rawPath);
+                if (!seen.Add(fullPath))
+                {
+                    continue;
+                }
+
+                if (!File.Exists(fullPath))
+                {
+                    errors.Add($"Image file not found: {fullPath}");
+                    continue;
+                }
+
+                if (!ImageAttachment.IsSupportedExtension(fullPath))
+                {
+                    errors.Add($"Unsupported image file extension: {fullPath}");
+                    continue;
+                }
+
+                try
+                {
+                    attachments.Add(ImageAttachment.FromFile(fullPath));
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Failed to read image '{fullPath}': {ex.Message}");
+                }
+            }
+
+            if (errors.Count > 0)
+            {
+                foreach (var error in errors)
+                {
+                    Console.Error.WriteLine($"Error: {error}");
+                }
+                return false;
+            }
+
+            return true;
         }
     }
 }

@@ -7,17 +7,25 @@ namespace Textgen
 {
     public static class PromptSequenceBuilder
     {
-        public static PromptSequence FromString(string prompt)
+        public static PromptSequence FromString(string prompt, IReadOnlyList<ImageAttachment>? attachments = null)
         {
+            var attachmentList = attachments ?? new List<ImageAttachment>();
+
             if (string.IsNullOrWhiteSpace(prompt))
             {
-                return new PromptSequence(new List<PromptMessage>(), PromptInputType.Plain);
+                if (attachmentList.Count == 0)
+                {
+                    return new PromptSequence(new List<PromptMessage>(), PromptInputType.Plain);
+                }
+
+                var emptyMessage = new PromptMessage(string.Empty, attachmentList);
+                return new PromptSequence(new List<PromptMessage> { emptyMessage }, PromptInputType.Plain);
             }
 
             if (TryParseStructuredPrompt(prompt, out var prompts))
             {
                 var structuredMessages = prompts
-                    .Select(p => new PromptMessage(p))
+                    .Select(p => new PromptMessage(p, attachmentList))
                     .ToList();
                 return new PromptSequence(structuredMessages, PromptInputType.Structured);
             }
@@ -25,7 +33,7 @@ namespace Textgen
             {
                 var messages = new List<PromptMessage>
                 {
-                    new PromptMessage(prompt.Trim())
+                    new PromptMessage(prompt.Trim(), attachmentList)
                 };
                 return new PromptSequence(messages, PromptInputType.Plain);
             }

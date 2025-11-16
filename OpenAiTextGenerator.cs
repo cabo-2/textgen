@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
@@ -12,11 +15,12 @@ namespace Textgen
         public OpenAiTextGenerator(HttpClient httpClient, string apiHost, ILogger logger = null) : base(httpClient, apiHost, logger)
         { }
 
-        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default)
+        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<ImageAttachment>? promptImages = null, CancellationToken cancellationToken = default)
         {
             OpenAiConfig config = (OpenAiConfig)conf;
 
             var history = new List<ConversationTurn>();
+            var promptImageList = promptImages?.ToList() ?? new List<ImageAttachment>();
             // Add system to messages
             var messages = new List<dynamic>();
             if (!string.IsNullOrEmpty(system))
@@ -57,7 +61,8 @@ namespace Textgen
                 });
             }
 
-            messages.Add(new { role = UserRole, content = prompt }); // current user prompt
+            var userContent = await BuildContentPartsAsync(prompt, promptImageList, cancellationToken);
+            messages.Add(new { role = UserRole, content = userContent }); // current user prompt
 
             var requestBody = new
             {
@@ -78,7 +83,7 @@ namespace Textgen
 
             if (config.Stream)
             {
-                return await ReadStreamedResponseAsync(response, config, system, model, prompt, history);
+                return await ReadStreamedResponseAsync(response, config, system, model, prompt, promptImageList, history);
             }
             else
             {
@@ -93,13 +98,14 @@ namespace Textgen
                     Config = config,
                     System = system,
                     History = history,
-                    Prompt = prompt.Trim(),
+                    Prompt = (prompt ?? string.Empty).Trim(),
+                    PromptImages = promptImageList.Select(p => p.Clone()).ToList(),
                     Completion = result.choices[0].message.content.ToString().Trim()
                 };
             }
         }
 
-        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, OpenAiConfig config, string system, string model, string prompt, List<ConversationTurn> history)
+        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, OpenAiConfig config, string system, string model, string prompt, IReadOnlyList<ImageAttachment> promptImages, List<ConversationTurn> history)
         {
             using (var stream = await response.Content.ReadAsStreamAsync())
             using (var reader = new StreamReader(stream))
@@ -141,12 +147,61 @@ namespace Textgen
                     Config = config,
                     System = system,
                     History = history,
-                    Prompt = prompt.Trim(),
+                    Prompt = (prompt ?? string.Empty).Trim(),
+                    PromptImages = promptImages.Select(p => p.Clone()).ToList(),
                     Completion = completionText.ToString().Trim()
                 };
             }
         }
 
         public override IConfig CreateDefaultConfig() => OpenAiConfig.Create();
+
+        private static async Task<object> BuildContentPartsAsync(string prompt, IReadOnlyList<ImageAttachment> promptImages, CancellationToken cancellationToken)
+        {
+            if (promptImages == null || promptImages.Count == 0)
+            {
+                return prompt;
+            }
+
+            var contentParts = new List<object>();
+            if (!string.IsNullOrWhiteSpace(prompt))
+            {
+                contentParts.Add(new { type = "input_text", text = prompt });
+            }
+
+            foreach (var attachment in promptImages)
+            {
+                var path = ResolveAttachmentPath(attachment);
+                var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+                var base64 = Convert.ToBase64String(bytes);
+                var mime = string.IsNullOrWhiteSpace(attachment.MimeType) ? "application/octet-stream" : attachment.MimeType;
+                contentParts.Add(new
+                {
+                    type = "input_image",
+                    image_url = new
+                    {
+                        url = $"data:{mime};base64,{base64}"
+                    }
+                });
+            }
+
+            return contentParts;
+        }
+
+        private static string ResolveAttachmentPath(ImageAttachment attachment)
+        {
+            if (!string.IsNullOrEmpty(attachment.SourcePath) && File.Exists(attachment.SourcePath))
+            {
+                return attachment.SourcePath;
+            }
+
+            if (!string.IsNullOrEmpty(attachment.StoredPath) && File.Exists(attachment.StoredPath))
+            {
+                return attachment.StoredPath;
+            }
+
+            var fallback = attachment.FileName ?? attachment.SourcePath ?? attachment.StoredPath ?? "<unknown>";
+            throw new FileNotFoundException($"Attachment file not found: {fallback}");
+        }
     }
 }

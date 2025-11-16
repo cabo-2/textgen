@@ -13,7 +13,14 @@ namespace Textgen
             _logger = logger;
         }
 
-        public abstract Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, CancellationToken cancellationToken = default);
+        public abstract Task<OutputResult> GenerateTextAsync(
+            string model,
+            string prompt,
+            string system,
+            IConfig conf,
+            OutputResult conversationLog,
+            IReadOnlyList<ImageAttachment>? promptImages = null,
+            CancellationToken cancellationToken = default);
 
         public abstract IConfig CreateDefaultConfig();
     }
