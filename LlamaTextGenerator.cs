@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
@@ -15,6 +18,7 @@ namespace Textgen
 
             StringBuilder sb = new StringBuilder();
             var history = new List<ConversationTurn>();
+            var promptImageList = promptImages?.ToList() ?? new List<ImageAttachment>();
 
             // Add system to request prompt
             if (!string.IsNullOrEmpty(system))
@@ -65,6 +69,8 @@ namespace Textgen
                 stop.Add($"{config.AssistantName}:");
             }
 
+            var images = await BuildImageArrayAsync(promptImageList, cancellationToken);
+
             var requestBody = new
             {
                 prompt = sb.ToString(),
@@ -80,7 +86,8 @@ namespace Textgen
                 repeat_penalty = config.RepeatPenalty,
                 stream = config.Stream,
                 cache_prompt = config.CachePrompt,
-                slot_id = config.SlotId
+                slot_id = config.SlotId,
+                images = images
             };
 
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
@@ -91,7 +98,7 @@ namespace Textgen
 
             if (config.Stream)
             {
-                return await ReadStreamedResponseAsync(response, config, system, model, prompt, history);
+                return await ReadStreamedResponseAsync(response, config, system, model, prompt, promptImageList, history);
             }
             else
             {
@@ -106,13 +113,14 @@ namespace Textgen
                     Config = config,
                     System = system,
                     History = history,
-                    Prompt = prompt.Trim(),
+                    Prompt = (prompt ?? string.Empty).Trim(),
+                    PromptImages = promptImageList.Select(p => p.Clone()).ToList(),
                     Completion = result.content.ToString().Trim()
                 };
             }
         }
 
-        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, LlamaConfig config, string system, string model, string prompt, List<ConversationTurn> history)
+        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, LlamaConfig config, string system, string model, string prompt, IReadOnlyList<ImageAttachment> promptImages, List<ConversationTurn> history)
         {
             using (var stream = await response.Content.ReadAsStreamAsync())
             using (var reader = new StreamReader(stream))
@@ -158,12 +166,47 @@ namespace Textgen
                     Config = config,
                     System = system,
                     History = history,
-                    Prompt = prompt.Trim(),
+                    Prompt = (prompt ?? string.Empty).Trim(),
+                    PromptImages = promptImages.Select(p => p.Clone()).ToList(),
                     Completion = completionText.ToString().Trim()
                 };
             }
         }
 
         public override IConfig CreateDefaultConfig() => LlamaConfig.Create();
+
+        private static async Task<List<string>> BuildImageArrayAsync(IReadOnlyList<ImageAttachment> promptImages, CancellationToken cancellationToken)
+        {
+            var images = new List<string>();
+            if (promptImages == null || promptImages.Count == 0)
+            {
+                return images;
+            }
+
+            foreach (var attachment in promptImages)
+            {
+                var path = ResolveAttachmentPath(attachment);
+                var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+                images.Add(Convert.ToBase64String(bytes));
+            }
+
+            return images;
+        }
+
+        private static string ResolveAttachmentPath(ImageAttachment attachment)
+        {
+            if (!string.IsNullOrEmpty(attachment.SourcePath) && File.Exists(attachment.SourcePath))
+            {
+                return attachment.SourcePath;
+            }
+
+            if (!string.IsNullOrEmpty(attachment.StoredPath) && File.Exists(attachment.StoredPath))
+            {
+                return attachment.StoredPath;
+            }
+
+            var fallback = attachment.FileName ?? attachment.SourcePath ?? attachment.StoredPath ?? "<unknown>";
+            throw new FileNotFoundException($"Attachment file not found: {fallback}");
+        }
     }
 }

@@ -297,12 +297,6 @@ namespace Textgen
                 }
             }
 
-            if (hasImages && textGenerator is not OpenAiTextGenerator)
-            {
-                Console.WriteLine("Error: Image attachments are currently supported only for OpenAI endpoints.");
-                return 1;
-            }
-
             PromptSequence promptSequence = PromptSequenceBuilder.FromString(prompt, promptAttachments);
             if (!promptSequence.IsValid)
             {

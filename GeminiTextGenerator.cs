@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
@@ -18,6 +21,7 @@ namespace Textgen
             GeminiConfig config = (GeminiConfig)conf;
 
             var history = new List<ConversationTurn>();
+            var promptImageList = promptImages?.ToList() ?? new List<ImageAttachment>();
             foreach (var entry in conversationLog.History)
             {
                 if (entry.HasContent)
@@ -73,10 +77,11 @@ namespace Textgen
             }
 
             // Current user prompt
+            var userParts = await BuildUserPartsAsync(prompt, promptImageList, cancellationToken);
             contents.Add(new
             {
                 role = "user",
-                parts = new[] { new { text = prompt } }
+                parts = userParts
             });
 
             var requestBody = new
@@ -126,11 +131,58 @@ namespace Textgen
                 Config = config,
                 System = system,
                 History = history,
-                Prompt = prompt.Trim(),
+                Prompt = (prompt ?? string.Empty).Trim(),
+                PromptImages = promptImageList.Select(p => p.Clone()).ToList(),
                 Completion = completion
             };
         }
 
         public override IConfig CreateDefaultConfig() => GeminiConfig.Create();
+
+        private static async Task<List<object>> BuildUserPartsAsync(string prompt, IReadOnlyList<ImageAttachment> promptImages, CancellationToken cancellationToken)
+        {
+            var parts = new List<object>();
+            if (!string.IsNullOrWhiteSpace(prompt))
+            {
+                parts.Add(new { text = prompt });
+            }
+
+            if (promptImages != null)
+            {
+                foreach (var attachment in promptImages)
+                {
+                    var path = ResolveAttachmentPath(attachment);
+                    var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
+                    var base64 = Convert.ToBase64String(bytes);
+                    var mime = string.IsNullOrWhiteSpace(attachment.MimeType) ? "application/octet-stream" : attachment.MimeType;
+                    parts.Add(new
+                    {
+                        inlineData = new
+                        {
+                            mimeType = mime,
+                            data = base64
+                        }
+                    });
+                }
+            }
+
+            return parts;
+        }
+
+        private static string ResolveAttachmentPath(ImageAttachment attachment)
+        {
+            if (!string.IsNullOrEmpty(attachment.SourcePath) && File.Exists(attachment.SourcePath))
+            {
+                return attachment.SourcePath;
+            }
+
+            if (!string.IsNullOrEmpty(attachment.StoredPath) && File.Exists(attachment.StoredPath))
+            {
+                return attachment.StoredPath;
+            }
+
+            var fallback = attachment.FileName ?? attachment.SourcePath ?? attachment.StoredPath ?? "<unknown>";
+            throw new FileNotFoundException($"Attachment file not found: {fallback}");
+        }
     }
 }
