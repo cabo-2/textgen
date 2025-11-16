@@ -51,6 +51,13 @@ tests/
 4. Verify output in-place: formatting (`@prompt`, `@prompt-images`, `@completion-images`), response quality, and any provider warnings.
 5. Jot notes in `tests/runs/.../notes.md` and keep the raw output for comparison next time.
 
+## Helper Scripts (`tests/scripts/*.sh`)
+- Naming rule: `run-<provider>-<mode>.sh` (provider = `openai|gemini|llama`, mode = `text|vision`).
+- Text scripts run with the baked-in prompt files; vision scripts require the first arg to be an image path.
+- `OUTPUT_ROOT` can override the default `tests/runs` target. Additional CLI args are forwarded.
+- API keys must be exported beforehand; scripts only set `TEXTGEN_API_HOST` (override with your own if needed).
+- Examples: `tests/scripts/run-openai-text.sh`, `tests/scripts/run-openai-vision.sh <image>`, `tests/scripts/run-llama-text.sh`.
+
 ## Scenario Checklists and Example Commands
 - Use `-O tests/runs/<date>-<scenario>/output` to keep artifacts grouped. Replace model names with whatever you need to validate.
 - Commands assume chat/completions endpoints; adjust host and model if you target other compatibility layers.

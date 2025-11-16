@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+require_env() {
+  local name="$1"
+  if [[ -z "${!name:-}" ]]; then
+    echo "Error: $name is not set. Export it before running this script." >&2
+    exit 1
+  fi
+}
+
+require_env OPENAI_API_KEY
+
+API_HOST="${TEXTGEN_API_HOST:-https://api.openai.com/v1/chat/completions}"
+OUTPUT_ROOT="${OUTPUT_ROOT:-tests/runs}"
+RUN_ID="$(date +%Y%m%d-%H%M%S)"
+SCENARIO="openai-text"
+OUT_DIR="${OUTPUT_ROOT}/${RUN_ID}-${SCENARIO}/output"
+PROMPT="tests/assets/prompts/text/sample-quickcheck.txt"
+
+mkdir -p "$OUT_DIR"
+
+TEXTGEN_API_HOST="$API_HOST" dotnet run --project cli -- \
+  -m gpt-4o-mini \
+  -P "$PROMPT" \
+  -O "$OUT_DIR" \
+  "$@"
