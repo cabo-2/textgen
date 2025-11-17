@@ -35,7 +35,7 @@ PROMPT="tests/assets/prompts/vision/sample-vision-check.txt"
 mkdir -p "$OUT_DIR"
 
 TEXTGEN_API_HOST="$API_HOST" dotnet run --project cli -- \
-  -m gpt-4o \
+  -m gpt-4o-mini \
   -P "$PROMPT" \
   --image "$IMAGE" \
   -O "$OUT_DIR" \
