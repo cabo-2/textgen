@@ -370,11 +370,13 @@ namespace Textgen
                 assistantLabel = "Assistant";
             }
 
-            bool cancelled = false;
+            var interruptTcs = new TaskCompletionSource<bool>();
             Console.CancelKeyPress += (s, e) =>
             {
+                // Prevent immediate process termination so we can persist the log, then exit the loop.
                 e.Cancel = true;
-                cancelled = true;
+                interruptTcs.TrySetResult(true);
+                Console.WriteLine();
             };
 
             Console.WriteLine("Conversation mode started (ends with exit/quit, also ends with Ctrl+C)\n");
@@ -397,10 +399,14 @@ namespace Textgen
             }
             Console.WriteLine();
 
-            while (!cancelled)
+            while (!interruptTcs.Task.IsCompleted)
             {
                 Console.Write($"{userLabel}> ");
-                string input = Console.ReadLine();
+                var inputTask = Task.Run(() => Console.ReadLine());
+                var completed = await Task.WhenAny(inputTask, interruptTcs.Task);
+                if (completed != inputTask) break;
+
+                string input = inputTask.Result;
                 if (input == null) break;
                 input = input.Trim();
                 if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)
