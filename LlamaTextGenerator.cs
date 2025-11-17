@@ -71,7 +71,10 @@ namespace Textgen
                 stop.Add($"{config.AssistantName}:");
             }
 
-            var images = await BuildImageArrayAsync(promptImageList, cancellationToken);
+            if (promptImageList.Count > 0)
+            {
+                _logger?.Log("WARNING: prompt images were provided but llama.cpp /completion does not support vision; images will be ignored and request will be text-only.");
+            }
 
             var requestBody = new
             {
@@ -88,8 +91,7 @@ namespace Textgen
                 repeat_penalty = config.RepeatPenalty,
                 stream = config.Stream,
                 cache_prompt = config.CachePrompt,
-                slot_id = config.SlotId,
-                images = images
+                slot_id = config.SlotId
             };
 
             var jsonRequest = JsonConvert.SerializeObject(requestBody);
@@ -182,39 +184,5 @@ namespace Textgen
         }
 
         public override IConfig CreateDefaultConfig() => LlamaConfig.Create();
-
-        private static async Task<List<string>> BuildImageArrayAsync(IReadOnlyList<ImageAttachment> promptImages, CancellationToken cancellationToken)
-        {
-            var images = new List<string>();
-            if (promptImages == null || promptImages.Count == 0)
-            {
-                return images;
-            }
-
-            foreach (var attachment in promptImages)
-            {
-                var path = ResolveAttachmentPath(attachment);
-                var bytes = await File.ReadAllBytesAsync(path, cancellationToken);
-                images.Add(Convert.ToBase64String(bytes));
-            }
-
-            return images;
-        }
-
-        private static string ResolveAttachmentPath(ImageAttachment attachment)
-        {
-            if (!string.IsNullOrEmpty(attachment.SourcePath) && File.Exists(attachment.SourcePath))
-            {
-                return attachment.SourcePath;
-            }
-
-            if (!string.IsNullOrEmpty(attachment.StoredPath) && File.Exists(attachment.StoredPath))
-            {
-                return attachment.StoredPath;
-            }
-
-            var fallback = attachment.FileName ?? attachment.SourcePath ?? attachment.StoredPath ?? "<unknown>";
-            throw new FileNotFoundException($"Attachment file not found: {fallback}");
-        }
     }
 }
