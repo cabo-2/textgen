@@ -175,7 +175,7 @@ namespace Textgen
             var contentParts = new List<object>();
             if (!string.IsNullOrWhiteSpace(prompt))
             {
-                contentParts.Add(new { type = "input_text", text = prompt });
+                contentParts.Add(new { type = "text", text = prompt });
             }
 
             foreach (var attachment in promptImages)
@@ -186,7 +186,7 @@ namespace Textgen
                 var mime = string.IsNullOrWhiteSpace(attachment.MimeType) ? "application/octet-stream" : attachment.MimeType;
                 contentParts.Add(new
                 {
-                    type = "input_image",
+                    type = "image_url",
                     image_url = new
                     {
                         url = $"data:{mime};base64,{base64}"
