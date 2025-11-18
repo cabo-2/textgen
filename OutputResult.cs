@@ -18,8 +18,8 @@ namespace Textgen
         public string? System { get; set; }
         public string? Prompt { get; set; }
         public string? Completion { get; set; }
-        public List<Attachment> PromptImages { get; set; } = new();
-        public List<Attachment> CompletionImages { get; set; } = new();
+        public List<Attachment> PromptAttachments { get; set; } = new();
+        public List<Attachment> CompletionAttachments { get; set; } = new();
         public List<ConversationTurn> History { get; set; } = new();
 
         public string Format(string format)
@@ -48,16 +48,16 @@ namespace Textgen
                         {
                             var history = History[i];
                             sb.Append($"@history-prompt_{i + 1}\n{history.Prompt ?? string.Empty}\n\n");
-                            AppendImageBlock(sb, $"history-prompt-images_{i + 1}", $"history_prompt_{i + 1}_image_", history.PromptImages);
+                            AppendAttachmentBlock(sb, $"history-prompt-attachments_{i + 1}", history.PromptAttachments);
                             sb.Append($"@history-completion_{i + 1}\n{history.Completion ?? string.Empty}\n\n");
-                            AppendImageBlock(sb, $"history-completion-images_{i + 1}", $"history_completion_{i + 1}_image_", history.CompletionImages);
+                            AppendAttachmentBlock(sb, $"history-completion-attachments_{i + 1}", history.CompletionAttachments);
                         }
                     }
 
                     sb.Append($"@prompt\n{Prompt ?? string.Empty}\n\n");
-                    AppendImageBlock(sb, "prompt-images", "prompt_image_", PromptImages);
+                    AppendAttachmentBlock(sb, "prompt-attachments", PromptAttachments);
                     sb.Append($"@completion\n{Completion ?? string.Empty}\n\n");
-                    AppendImageBlock(sb, "completion-images", "completion_image_", CompletionImages);
+                    AppendAttachmentBlock(sb, "completion-attachments", CompletionAttachments);
 
                     return sb.ToString().TrimEnd() + "\n";
             }
@@ -90,8 +90,8 @@ namespace Textgen
 
             var historyPrompts = new Dictionary<int, string>();
             var historyCompletions = new Dictionary<int, string>();
-            var historyPromptImages = new Dictionary<int, List<Attachment>>();
-            var historyCompletionImages = new Dictionary<int, List<Attachment>>();
+            var historyPromptAttachments = new Dictionary<int, List<Attachment>>();
+            var historyCompletionAttachments = new Dictionary<int, List<Attachment>>();
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -121,17 +121,17 @@ namespace Textgen
                 {
                     result.System = ReadBlock(lines, ref i, trim: true);
                 }
-                else if (line.StartsWith("@history-prompt-images_"))
+                else if (line.StartsWith("@history-prompt-attachments_"))
                 {
-                    var index = ParseTrailingIndex(line, "@history-prompt-images_");
+                    var index = ParseTrailingIndex(line, "@history-prompt-attachments_");
                     var blockLines = ReadBlockLines(lines, ref i);
-                    historyPromptImages[index] = ParseAttachmentBlock(blockLines, $"history_prompt_{index}_image_");
+                    historyPromptAttachments[index] = ParseAttachmentBlock(blockLines);
                 }
-                else if (line.StartsWith("@history-completion-images_"))
+                else if (line.StartsWith("@history-completion-attachments_"))
                 {
-                    var index = ParseTrailingIndex(line, "@history-completion-images_");
+                    var index = ParseTrailingIndex(line, "@history-completion-attachments_");
                     var blockLines = ReadBlockLines(lines, ref i);
-                    historyCompletionImages[index] = ParseAttachmentBlock(blockLines, $"history_completion_{index}_image_");
+                    historyCompletionAttachments[index] = ParseAttachmentBlock(blockLines);
                 }
                 else if (line.StartsWith("@history-prompt"))
                 {
@@ -143,15 +143,15 @@ namespace Textgen
                     var index = int.Parse(line.Split('_')[1]);
                     historyCompletions[index] = ReadBlock(lines, ref i, trim: true);
                 }
-                else if (line.StartsWith("@prompt-images"))
+                else if (line.StartsWith("@prompt-attachments"))
                 {
                     var blockLines = ReadBlockLines(lines, ref i);
-                    result.PromptImages = ParseAttachmentBlock(blockLines, "prompt_image_");
+                    result.PromptAttachments = ParseAttachmentBlock(blockLines);
                 }
-                else if (line.StartsWith("@completion-images"))
+                else if (line.StartsWith("@completion-attachments"))
                 {
                     var blockLines = ReadBlockLines(lines, ref i);
-                    result.CompletionImages = ParseAttachmentBlock(blockLines, "completion_image_");
+                    result.CompletionAttachments = ParseAttachmentBlock(blockLines);
                 }
                 else if (line.StartsWith("@prompt"))
                 {
@@ -167,23 +167,23 @@ namespace Textgen
             {
                 historyPrompts.Keys.DefaultIfEmpty(0).Max(),
                 historyCompletions.Keys.DefaultIfEmpty(0).Max(),
-                historyPromptImages.Keys.DefaultIfEmpty(0).Max(),
-                historyCompletionImages.Keys.DefaultIfEmpty(0).Max()
+                historyPromptAttachments.Keys.DefaultIfEmpty(0).Max(),
+                historyCompletionAttachments.Keys.DefaultIfEmpty(0).Max()
             }.Max();
 
             for (int j = 1; j <= maxIndex; j++)
             {
                 historyPrompts.TryGetValue(j, out var prompt);
                 historyCompletions.TryGetValue(j, out var completion);
-                historyPromptImages.TryGetValue(j, out var promptImages);
-                historyCompletionImages.TryGetValue(j, out var completionImages);
+                historyPromptAttachments.TryGetValue(j, out var promptImages);
+                historyCompletionAttachments.TryGetValue(j, out var completionImages);
 
                 var entry = new ConversationTurn
                 {
                     Prompt = prompt,
                     Completion = completion,
-                    PromptImages = promptImages ?? new List<Attachment>(),
-                    CompletionImages = completionImages ?? new List<Attachment>()
+                    PromptAttachments = promptImages ?? new List<Attachment>(),
+                    CompletionAttachments = completionImages ?? new List<Attachment>()
                 };
 
                 if (entry.HasContent)
@@ -217,9 +217,11 @@ namespace Textgen
             return list;
         }
 
-        private static List<Attachment> ParseAttachmentBlock(List<string> blockLines, string keyPrefix)
+        private static List<Attachment> ParseAttachmentBlock(List<string> blockLines)
         {
-            var attachments = new SortedDictionary<int, Attachment>();
+            var attachments = new List<Attachment>();
+            var pendingMeta = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var rawLine in blockLines)
             {
                 if (string.IsNullOrWhiteSpace(rawLine))
@@ -228,84 +230,127 @@ namespace Textgen
                 }
 
                 var trimmed = rawLine.Trim();
-                if (trimmed.StartsWith("count=", StringComparison.OrdinalIgnoreCase))
+                if (trimmed.StartsWith("#"))
                 {
+                    var comment = trimmed.Substring(1).Trim();
+                    var idx = comment.IndexOf('=');
+                    if (idx > 0)
+                    {
+                        var key = comment.Substring(0, idx).Trim();
+                        var value = comment.Substring(idx + 1).Trim();
+                        pendingMeta[key] = value;
+                    }
                     continue;
                 }
 
-                var separatorIndex = trimmed.IndexOf('=');
-                if (separatorIndex < 0)
+                var path = ParsePathLineWithInlineComment(trimmed);
+                if (string.IsNullOrWhiteSpace(path))
                 {
+                    pendingMeta.Clear();
                     continue;
                 }
 
-                var key = trimmed.Substring(0, separatorIndex);
-                var value = trimmed.Substring(separatorIndex + 1);
-
-                if (!key.StartsWith(keyPrefix, StringComparison.OrdinalIgnoreCase))
-                {
-                    continue;
-                }
-
-                var remainder = key.Substring(keyPrefix.Length);
-                var underscoreIndex = remainder.IndexOf('_');
-                if (underscoreIndex < 0)
-                {
-                    continue;
-                }
-
-                var indexPart = remainder.Substring(0, underscoreIndex);
-                if (!int.TryParse(indexPart, out var attachmentIndex))
-                {
-                    continue;
-                }
-
-                var field = remainder.Substring(underscoreIndex + 1);
-                if (!attachments.TryGetValue(attachmentIndex, out var attachment))
-                {
-                    attachment = new ImageAttachment();
-                    attachments[attachmentIndex] = attachment;
-                }
-
-                ApplyAttachmentField(attachment, field, value);
+                var attachment = CreateAttachmentFromMetadata(path, pendingMeta);
+                attachments.Add(attachment);
+                pendingMeta.Clear();
             }
 
-            return attachments
-                .OrderBy(kvp => kvp.Key)
-                .Select(kvp => kvp.Value)
-                .ToList();
+            return attachments;
         }
 
-        private static void ApplyAttachmentField(Attachment attachment, string field, string value)
+        private static Attachment CreateAttachmentFromMetadata(string path, IDictionary<string, string> meta)
         {
-            switch (field)
+            meta.TryGetValue("type", out var type);
+            var attachmentType = string.IsNullOrWhiteSpace(type) ? "image" : type.Trim();
+
+            Attachment attachment = attachmentType.Equals("image", StringComparison.OrdinalIgnoreCase)
+                ? new ImageAttachment()
+                : new FileAttachment(attachmentType);
+
+            attachment.StoredPath = path;
+            attachment.FileName = Path.GetFileName(path);
+
+            if (meta.TryGetValue("source_path", out var source))
             {
-                case "path":
-                    attachment.StoredPath = value;
-                    if (string.IsNullOrEmpty(attachment.FileName))
-                    {
-                        attachment.FileName = Path.GetFileName(value);
-                    }
-                    break;
-                case "original_path":
-                    attachment.SourcePath = value;
-                    break;
-                case "sha256":
-                    attachment.Sha256 = value;
-                    break;
-                case "mime":
-                    attachment.MimeType = value;
-                    break;
-                case "size_bytes":
-                    if (long.TryParse(value, out var size))
-                    {
-                        attachment.SizeBytes = size;
-                    }
-                    break;
-                case "caption":
-                    attachment.Caption = value;
-                    break;
+                attachment.SourcePath = source;
             }
+
+            if (meta.TryGetValue("sha256", out var sha))
+            {
+                attachment.Sha256 = sha;
+            }
+
+            if (meta.TryGetValue("size", out var sizeString) || meta.TryGetValue("size_bytes", out sizeString))
+            {
+                if (long.TryParse(sizeString, out var size))
+                {
+                    attachment.SizeBytes = size;
+                }
+            }
+
+            if (meta.TryGetValue("mime", out var mime))
+            {
+                attachment.MimeType = mime;
+            }
+
+            if (meta.TryGetValue("caption", out var caption))
+            {
+                attachment.Caption = caption;
+            }
+
+            return attachment;
+        }
+
+        private static string ParsePathLineWithInlineComment(string line)
+        {
+            var sb = new StringBuilder();
+            bool inQuote = false;
+            char quoteChar = '\0';
+            for (int i = 0; i < line.Length; i++)
+            {
+                var ch = line[i];
+                if (!inQuote && ch == '#')
+                {
+                    break;
+                }
+
+                if (ch == '\\' && inQuote && i + 1 < line.Length)
+                {
+                    var next = line[i + 1];
+                    if (next == quoteChar || next == '\\')
+                    {
+                        sb.Append(next);
+                        i++;
+                        continue;
+                    }
+                }
+
+                if (ch == '\'' || ch == '"')
+                {
+                    if (!inQuote)
+                    {
+                        inQuote = true;
+                        quoteChar = ch;
+                        continue;
+                    }
+                    else if (quoteChar == ch)
+                    {
+                        inQuote = false;
+                        quoteChar = '\0';
+                        continue;
+                    }
+                }
+
+                sb.Append(ch);
+            }
+
+            var extracted = sb.ToString().Trim();
+            if (extracted.Length == 0)
+            {
+                return string.Empty;
+            }
+
+            return extracted;
         }
 
         private static int ParseTrailingIndex(string line, string prefix)
@@ -319,7 +364,7 @@ namespace Textgen
             return index;
         }
 
-        private static void AppendImageBlock(StringBuilder sb, string blockName, string keyPrefix, IReadOnlyList<Attachment> attachments)
+        private static void AppendAttachmentBlock(StringBuilder sb, string blockName, IReadOnlyList<Attachment> attachments)
         {
             if (attachments == null || attachments.Count == 0)
             {
@@ -327,40 +372,49 @@ namespace Textgen
             }
 
             sb.Append($"@{blockName}\n");
-            sb.Append($"count={attachments.Count}\n");
-            for (int i = 0; i < attachments.Count; i++)
+            foreach (var attachment in attachments)
             {
-                var attachment = attachments[i];
-                var prefix = $"{keyPrefix}{i + 1}_";
-                sb.Append($"{prefix}path={attachment.StoredPath ?? attachment.SourcePath ?? attachment.FileName ?? string.Empty}\n");
-                if (!string.IsNullOrEmpty(attachment.SourcePath))
+                if (!string.IsNullOrWhiteSpace(attachment.Type))
                 {
-                    sb.Append($"{prefix}original_path={attachment.SourcePath}\n");
+                    sb.Append($"# type={attachment.Type}\n");
                 }
-                if (!string.IsNullOrEmpty(attachment.Sha256))
+
+                if (!string.IsNullOrWhiteSpace(attachment.Sha256))
                 {
-                    sb.Append($"{prefix}sha256={attachment.Sha256}\n");
+                    sb.Append($"# sha256={attachment.Sha256}\n");
                 }
-                if (!string.IsNullOrEmpty(attachment.MimeType))
-                {
-                    sb.Append($"{prefix}mime={attachment.MimeType}\n");
-                }
+
                 if (attachment.SizeBytes.HasValue)
                 {
-                    sb.Append($"{prefix}size_bytes={attachment.SizeBytes.Value}\n");
+                    sb.Append($"# size={attachment.SizeBytes.Value}\n");
                 }
-                if (!string.IsNullOrEmpty(attachment.Caption))
-                {
-                    sb.Append($"{prefix}caption={attachment.Caption}\n");
-                }
+
+                var path = attachment.StoredPath ?? attachment.SourcePath ?? attachment.FileName ?? string.Empty;
+                sb.Append($"{FormatPath(path)}\n\n");
             }
-            sb.Append("\n");
+        }
+
+        private static string FormatPath(string path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return path;
+            }
+
+            bool needsQuotes = path.IndexOfAny(new[] { ' ', '\t', '#', '"' , '\'' }) >= 0;
+            if (!needsQuotes)
+            {
+                return path;
+            }
+
+            var escaped = path.Replace("\\", "\\\\").Replace("\"", "\\\"");
+            return $"\"{escaped}\"";
         }
 
         private void Normalize()
         {
-            PromptImages ??= new List<Attachment>();
-            CompletionImages ??= new List<Attachment>();
+            PromptAttachments ??= new List<Attachment>();
+            CompletionAttachments ??= new List<Attachment>();
             History ??= new List<ConversationTurn>();
 
             foreach (var turn in History)
@@ -370,8 +424,8 @@ namespace Textgen
                     continue;
                 }
 
-                turn.PromptImages ??= new List<Attachment>();
-                turn.CompletionImages ??= new List<Attachment>();
+                turn.PromptAttachments ??= new List<Attachment>();
+                turn.CompletionAttachments ??= new List<Attachment>();
             }
         }
     }

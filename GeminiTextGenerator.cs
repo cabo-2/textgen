@@ -40,15 +40,15 @@ namespace Textgen
 
             if (!string.IsNullOrEmpty(conversationLog.Prompt) ||
                 !string.IsNullOrEmpty(conversationLog.Completion) ||
-                conversationLog.PromptImages.Count > 0 ||
-                conversationLog.CompletionImages.Count > 0)
+                conversationLog.PromptAttachments.Count > 0 ||
+                conversationLog.CompletionAttachments.Count > 0)
             {
                 history.Add(new ConversationTurn
                 {
                     Prompt = conversationLog.Prompt,
                     Completion = conversationLog.Completion,
-                    PromptImages = conversationLog.PromptImages.Select(p => p.Clone()).ToList(),
-                    CompletionImages = conversationLog.CompletionImages.Select(p => p.Clone()).ToList()
+                    PromptAttachments = conversationLog.PromptAttachments.Select(p => p.Clone()).ToList(),
+                    CompletionAttachments = conversationLog.CompletionAttachments.Select(p => p.Clone()).ToList()
                 });
             }
 
@@ -140,7 +140,7 @@ namespace Textgen
                 System = system,
                 History = history,
                 Prompt = (prompt ?? string.Empty).Trim(),
-                PromptImages = imageAttachments.Select(p => p.Clone()).ToList(),
+                PromptAttachments = imageAttachments.Select(p => p.Clone()).ToList(),
                 Completion = completion
             };
         }

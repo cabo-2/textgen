@@ -47,15 +47,15 @@ namespace Textgen
 
             if (!string.IsNullOrEmpty(conversationLog.Prompt) ||
                 !string.IsNullOrEmpty(conversationLog.Completion) ||
-                conversationLog.PromptImages.Count > 0 ||
-                conversationLog.CompletionImages.Count > 0)
+                conversationLog.PromptAttachments.Count > 0 ||
+                conversationLog.CompletionAttachments.Count > 0)
             {
                 history.Add(new ConversationTurn
                 {
                     Prompt = conversationLog.Prompt,
                     Completion = conversationLog.Completion,
-                    PromptImages = conversationLog.PromptImages.Select(p => p.Clone()).ToList(),
-                    CompletionImages = conversationLog.CompletionImages.Select(p => p.Clone()).ToList()
+                    PromptAttachments = conversationLog.PromptAttachments.Select(p => p.Clone()).ToList(),
+                    CompletionAttachments = conversationLog.CompletionAttachments.Select(p => p.Clone()).ToList()
                 });
             }
 
@@ -73,7 +73,8 @@ namespace Textgen
 
             if (promptAttachmentList.Count > 0)
             {
-                _logger?.Log("WARNING: prompt attachments were provided but llama.cpp /completion does not support vision; images will be ignored and request will be text-only.");
+                _logger?.Log("WARNING: prompt attachments were provided but llama.cpp /completion does not support attachments; they will be ignored and the request will be text-only.");
+                promptAttachmentList.Clear();
             }
 
             var requestBody = new
@@ -119,7 +120,7 @@ namespace Textgen
                     System = system,
                     History = history,
                     Prompt = (prompt ?? string.Empty).Trim(),
-                    PromptImages = promptAttachmentList.Select(p => p.Clone()).ToList(),
+                    PromptAttachments = promptAttachmentList.Select(p => p.Clone()).ToList(),
                     Completion = completion.Trim()
                 };
             }
@@ -177,7 +178,7 @@ namespace Textgen
                     System = system,
                     History = history,
                     Prompt = (prompt ?? string.Empty).Trim(),
-                    PromptImages = promptImages.Select(p => p.Clone()).ToList(),
+                    PromptAttachments = promptImages.Select(p => p.Clone()).ToList(),
                     Completion = completionText.ToString().Trim()
                 };
             }
