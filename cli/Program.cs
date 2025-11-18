@@ -529,9 +529,9 @@ namespace Textgen
             }
         }
 
-        private static bool TryBuildAttachments(IReadOnlyList<string> imagePaths, out List<ImageAttachment> attachments)
+        private static bool TryBuildAttachments(IReadOnlyList<string> imagePaths, out List<Attachment> attachments)
         {
-            attachments = new List<ImageAttachment>();
+            attachments = new List<Attachment>();
             if (imagePaths == null || imagePaths.Count == 0)
             {
                 return true;

@@ -8,9 +8,9 @@ namespace Textgen
 {
     public static class PromptSequenceBuilder
     {
-        public static PromptSequence FromString(string prompt, IReadOnlyList<ImageAttachment>? attachments = null)
+        public static PromptSequence FromString(string prompt, IReadOnlyList<Attachment>? attachments = null)
         {
-            var attachmentList = attachments ?? new List<ImageAttachment>();
+            var attachmentList = attachments ?? new List<Attachment>();
 
             if (string.IsNullOrWhiteSpace(prompt))
             {

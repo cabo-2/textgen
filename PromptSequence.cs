@@ -12,14 +12,14 @@ namespace Textgen
 
     public sealed class PromptMessage
     {
-        public PromptMessage(string text, IEnumerable<ImageAttachment>? attachments = null)
+        public PromptMessage(string text, IEnumerable<Attachment>? attachments = null)
         {
             Text = text ?? string.Empty;
-            Attachments = attachments != null ? new List<ImageAttachment>(attachments) : new List<ImageAttachment>();
+            Attachments = attachments != null ? new List<Attachment>(attachments) : new List<Attachment>();
         }
 
         public string Text { get; }
-        public IReadOnlyList<ImageAttachment> Attachments { get; }
+        public IReadOnlyList<Attachment> Attachments { get; }
     }
 
     public sealed class PromptSequence

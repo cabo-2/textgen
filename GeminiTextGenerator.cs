@@ -17,13 +17,19 @@ namespace Textgen
             _apiKey = apiKey ?? throw new ArgumentNullException(nameof(apiKey));
         }
 
-        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<ImageAttachment>? promptImages = null, CancellationToken cancellationToken = default)
+        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<Attachment>? promptAttachments = null, CancellationToken cancellationToken = default)
         {
             if (conf is not GeminiConfig config)
                 throw new ArgumentException("Expected GeminiConfig", nameof(conf));
 
             var history = new List<ConversationTurn>();
-            var promptImageList = promptImages?.ToList() ?? new List<ImageAttachment>();
+            var promptAttachmentList = promptAttachments?.ToList() ?? new List<Attachment>();
+            var imageAttachments = promptAttachmentList.OfType<ImageAttachment>().ToList();
+            var unsupported = promptAttachmentList.Where(a => a is not ImageAttachment).ToList();
+            if (unsupported.Count > 0)
+            {
+                throw new NotSupportedException($"Gemini generateContent only supports image attachments; found unsupported types: {string.Join(", ", unsupported.Select(a => a.Type))}");
+            }
             foreach (var entry in conversationLog.History)
             {
                 if (entry.HasContent)
@@ -79,7 +85,7 @@ namespace Textgen
             }
 
             // Current user prompt
-            var userParts = await BuildUserPartsAsync(prompt, promptImageList, cancellationToken);
+            var userParts = await BuildUserPartsAsync(prompt, imageAttachments, cancellationToken);
             contents.Add(new
             {
                 role = "user",
@@ -134,7 +140,7 @@ namespace Textgen
                 System = system,
                 History = history,
                 Prompt = (prompt ?? string.Empty).Trim(),
-                PromptImages = promptImageList.Select(p => p.Clone()).ToList(),
+                PromptImages = imageAttachments.Select(p => p.Clone()).ToList(),
                 Completion = completion
             };
         }
@@ -171,7 +177,7 @@ namespace Textgen
             return parts;
         }
 
-        private static string ResolveAttachmentPath(ImageAttachment attachment)
+        private static string ResolveAttachmentPath(Attachment attachment)
         {
             if (!string.IsNullOrEmpty(attachment.SourcePath) && File.Exists(attachment.SourcePath))
             {

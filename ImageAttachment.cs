@@ -6,7 +6,7 @@ using System.Security.Cryptography;
 
 namespace Textgen
 {
-    public class ImageAttachment
+    public sealed class ImageAttachment : Attachment
     {
         private static readonly Dictionary<string, string> MimeTypeMap = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -21,13 +21,9 @@ namespace Textgen
             [".heic"] = "image/heic"
         };
 
-        public string? FileName { get; set; }
-        public string? SourcePath { get; set; }
-        public string? StoredPath { get; set; }
-        public string? MimeType { get; set; }
-        public long? SizeBytes { get; set; }
-        public string? Sha256 { get; set; }
-        public string? Caption { get; set; }
+        public ImageAttachment() : base("image")
+        {
+        }
 
         public static bool IsSupportedExtension(string path)
         {
@@ -64,18 +60,11 @@ namespace Textgen
             };
         }
 
-        public ImageAttachment Clone()
+        public override Attachment Clone()
         {
-            return new ImageAttachment
-            {
-                FileName = FileName,
-                SourcePath = SourcePath,
-                StoredPath = StoredPath,
-                MimeType = MimeType,
-                SizeBytes = SizeBytes,
-                Sha256 = Sha256,
-                Caption = Caption
-            };
+            var clone = new ImageAttachment();
+            CopyBasePropertiesTo(clone);
+            return clone;
         }
 
         private static string? GetMimeType(string extension)

@@ -18,8 +18,8 @@ namespace Textgen
         public string? System { get; set; }
         public string? Prompt { get; set; }
         public string? Completion { get; set; }
-        public List<ImageAttachment> PromptImages { get; set; } = new();
-        public List<ImageAttachment> CompletionImages { get; set; } = new();
+        public List<Attachment> PromptImages { get; set; } = new();
+        public List<Attachment> CompletionImages { get; set; } = new();
         public List<ConversationTurn> History { get; set; } = new();
 
         public string Format(string format)
@@ -90,8 +90,8 @@ namespace Textgen
 
             var historyPrompts = new Dictionary<int, string>();
             var historyCompletions = new Dictionary<int, string>();
-            var historyPromptImages = new Dictionary<int, List<ImageAttachment>>();
-            var historyCompletionImages = new Dictionary<int, List<ImageAttachment>>();
+            var historyPromptImages = new Dictionary<int, List<Attachment>>();
+            var historyCompletionImages = new Dictionary<int, List<Attachment>>();
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -182,8 +182,8 @@ namespace Textgen
                 {
                     Prompt = prompt,
                     Completion = completion,
-                    PromptImages = promptImages ?? new List<ImageAttachment>(),
-                    CompletionImages = completionImages ?? new List<ImageAttachment>()
+                    PromptImages = promptImages ?? new List<Attachment>(),
+                    CompletionImages = completionImages ?? new List<Attachment>()
                 };
 
                 if (entry.HasContent)
@@ -217,9 +217,9 @@ namespace Textgen
             return list;
         }
 
-        private static List<ImageAttachment> ParseAttachmentBlock(List<string> blockLines, string keyPrefix)
+        private static List<Attachment> ParseAttachmentBlock(List<string> blockLines, string keyPrefix)
         {
-            var attachments = new SortedDictionary<int, ImageAttachment>();
+            var attachments = new SortedDictionary<int, Attachment>();
             foreach (var rawLine in blockLines)
             {
                 if (string.IsNullOrWhiteSpace(rawLine))
@@ -276,7 +276,7 @@ namespace Textgen
                 .ToList();
         }
 
-        private static void ApplyAttachmentField(ImageAttachment attachment, string field, string value)
+        private static void ApplyAttachmentField(Attachment attachment, string field, string value)
         {
             switch (field)
             {
@@ -319,7 +319,7 @@ namespace Textgen
             return index;
         }
 
-        private static void AppendImageBlock(StringBuilder sb, string blockName, string keyPrefix, IReadOnlyList<ImageAttachment> attachments)
+        private static void AppendImageBlock(StringBuilder sb, string blockName, string keyPrefix, IReadOnlyList<Attachment> attachments)
         {
             if (attachments == null || attachments.Count == 0)
             {
@@ -359,8 +359,8 @@ namespace Textgen
 
         private void Normalize()
         {
-            PromptImages ??= new List<ImageAttachment>();
-            CompletionImages ??= new List<ImageAttachment>();
+            PromptImages ??= new List<Attachment>();
+            CompletionImages ??= new List<Attachment>();
             History ??= new List<ConversationTurn>();
 
             foreach (var turn in History)
@@ -370,8 +370,8 @@ namespace Textgen
                     continue;
                 }
 
-                turn.PromptImages ??= new List<ImageAttachment>();
-                turn.CompletionImages ??= new List<ImageAttachment>();
+                turn.PromptImages ??= new List<Attachment>();
+                turn.CompletionImages ??= new List<Attachment>();
             }
         }
     }

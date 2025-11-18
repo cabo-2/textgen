@@ -8,9 +8,9 @@ namespace Textgen
     public class ConversationTurn
     {
         public string? Prompt { get; set; }
-        public List<ImageAttachment> PromptImages { get; set; } = new();
+        public List<Attachment> PromptImages { get; set; } = new();
         public string? Completion { get; set; }
-        public List<ImageAttachment> CompletionImages { get; set; } = new();
+        public List<Attachment> CompletionImages { get; set; } = new();
 
         public bool HasContent =>
             !string.IsNullOrWhiteSpace(Prompt) ||
@@ -24,8 +24,8 @@ namespace Textgen
             {
                 Prompt = Prompt,
                 Completion = Completion,
-                PromptImages = PromptImages?.Select(p => p.Clone()).ToList() ?? new List<ImageAttachment>(),
-                CompletionImages = CompletionImages?.Select(p => p.Clone()).ToList() ?? new List<ImageAttachment>()
+                PromptImages = PromptImages?.Select(p => p.Clone()).ToList() ?? new List<Attachment>(),
+                CompletionImages = CompletionImages?.Select(p => p.Clone()).ToList() ?? new List<Attachment>()
             };
         }
     }

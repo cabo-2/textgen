@@ -13,14 +13,14 @@ namespace Textgen
         public LlamaTextGenerator(HttpClient httpClient, string apiHost, ILogger? logger = null) : base(httpClient, apiHost, logger)
         { }
 
-        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<ImageAttachment>? promptImages = null, CancellationToken cancellationToken = default)
+        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<Attachment>? promptAttachments = null, CancellationToken cancellationToken = default)
         {
             if (conf is not LlamaConfig config)
                 throw new ArgumentException("Expected LlamaConfig", nameof(conf));
 
             StringBuilder sb = new StringBuilder();
             var history = new List<ConversationTurn>();
-            var promptImageList = promptImages?.ToList() ?? new List<ImageAttachment>();
+            var promptAttachmentList = promptAttachments?.ToList() ?? new List<Attachment>();
 
             // Add system to request prompt
             if (!string.IsNullOrEmpty(system))
@@ -71,9 +71,9 @@ namespace Textgen
                 stop.Add($"{config.AssistantName}:");
             }
 
-            if (promptImageList.Count > 0)
+            if (promptAttachmentList.Count > 0)
             {
-                _logger?.Log("WARNING: prompt images were provided but llama.cpp /completion does not support vision; images will be ignored and request will be text-only.");
+                _logger?.Log("WARNING: prompt attachments were provided but llama.cpp /completion does not support vision; images will be ignored and request will be text-only.");
             }
 
             var requestBody = new
@@ -102,7 +102,7 @@ namespace Textgen
 
             if (config.Stream)
             {
-                return await ReadStreamedResponseAsync(response, config, system, model, prompt, promptImageList, history);
+                return await ReadStreamedResponseAsync(response, config, system, model, prompt, promptAttachmentList, history);
             }
             else
             {
@@ -119,13 +119,13 @@ namespace Textgen
                     System = system,
                     History = history,
                     Prompt = (prompt ?? string.Empty).Trim(),
-                    PromptImages = promptImageList.Select(p => p.Clone()).ToList(),
+                    PromptImages = promptAttachmentList.Select(p => p.Clone()).ToList(),
                     Completion = completion.Trim()
                 };
             }
         }
 
-        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, LlamaConfig config, string system, string model, string prompt, IReadOnlyList<ImageAttachment> promptImages, List<ConversationTurn> history)
+        private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, LlamaConfig config, string system, string model, string prompt, IReadOnlyList<Attachment> promptImages, List<ConversationTurn> history)
         {
             using (var stream = await response.Content.ReadAsStreamAsync())
             using (var reader = new StreamReader(stream))

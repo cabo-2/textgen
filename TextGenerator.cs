@@ -22,7 +22,7 @@ namespace Textgen
             string system,
             IConfig conf,
             OutputResult conversationLog,
-            IReadOnlyList<ImageAttachment>? promptImages = null,
+            IReadOnlyList<Attachment>? promptAttachments = null,
             CancellationToken cancellationToken = default);
 
         public abstract IConfig CreateDefaultConfig();

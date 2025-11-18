@@ -16,13 +16,19 @@ namespace Textgen
         public OpenAiTextGenerator(HttpClient httpClient, string apiHost, ILogger? logger = null) : base(httpClient, apiHost, logger)
         { }
 
-        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<ImageAttachment>? promptImages = null, CancellationToken cancellationToken = default)
+        public override async Task<OutputResult> GenerateTextAsync(string model, string prompt, string system, IConfig conf, OutputResult conversationLog, IReadOnlyList<Attachment>? promptAttachments = null, CancellationToken cancellationToken = default)
         {
             if (conf is not OpenAiConfig config)
                 throw new ArgumentException("Expected OpenAiConfig", nameof(conf));
 
             var history = new List<ConversationTurn>();
-            var promptImageList = promptImages?.ToList() ?? new List<ImageAttachment>();
+            var promptAttachmentList = promptAttachments?.ToList() ?? new List<Attachment>();
+            var imageAttachments = promptAttachmentList.OfType<ImageAttachment>().ToList();
+            var unsupported = promptAttachmentList.Where(a => a is not ImageAttachment).ToList();
+            if (unsupported.Count > 0)
+            {
+                throw new NotSupportedException($"OpenAI chat completions only support image attachments; found unsupported types: {string.Join(", ", unsupported.Select(a => a.Type))}");
+            }
             // Add system to messages
             var messages = new List<dynamic>();
             if (!string.IsNullOrEmpty(system))
@@ -63,7 +69,7 @@ namespace Textgen
                 });
             }
 
-            var userContent = await BuildContentPartsAsync(prompt, promptImageList, cancellationToken);
+            var userContent = await BuildContentPartsAsync(prompt, imageAttachments, cancellationToken);
             messages.Add(new { role = UserRole, content = userContent }); // current user prompt
 
             var requestBody = new
@@ -85,7 +91,7 @@ namespace Textgen
 
             if (config.Stream)
             {
-                return await ReadStreamedResponseAsync(response, config, system, model, prompt, promptImageList, history);
+                return await ReadStreamedResponseAsync(response, config, system, model, prompt, imageAttachments, history);
             }
             else
             {
@@ -102,7 +108,7 @@ namespace Textgen
                     System = system,
                     History = history,
                     Prompt = (prompt ?? string.Empty).Trim(),
-                    PromptImages = promptImageList.Select(p => p.Clone()).ToList(),
+                    PromptImages = imageAttachments.Select(p => p.Clone()).ToList(),
                     Completion = completion.Trim()
                 };
             }
@@ -197,7 +203,7 @@ namespace Textgen
             return contentParts;
         }
 
-        private static string ResolveAttachmentPath(ImageAttachment attachment)
+        private static string ResolveAttachmentPath(Attachment attachment)
         {
             if (!string.IsNullOrEmpty(attachment.SourcePath) && File.Exists(attachment.SourcePath))
             {
