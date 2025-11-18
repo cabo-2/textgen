@@ -27,7 +27,7 @@ namespace Textgen
             var unsupported = promptAttachmentList.Where(a => a is not ImageAttachment).ToList();
             if (unsupported.Count > 0)
             {
-                throw new NotSupportedException($"OpenAI chat completions only support image attachments; found unsupported types: {string.Join(", ", unsupported.Select(a => a.Type))}");
+                _logger?.Log($"WARNING: Non-image attachments were provided and will be ignored for OpenAI: {string.Join(", ", unsupported.Select(a => a.Type))}");
             }
             // Add system to messages
             var messages = new List<dynamic>();
@@ -108,10 +108,10 @@ namespace Textgen
                     System = system,
                     History = history,
                     Prompt = (prompt ?? string.Empty).Trim(),
-                PromptAttachments = imageAttachments.Select(p => p.Clone()).ToList(),
-                Completion = completion.Trim()
-            };
-        }
+                    PromptAttachments = imageAttachments.Select(p => p.Clone()).ToList(),
+                    Completion = completion.Trim()
+                };
+            }
         }
 
         private async Task<OutputResult> ReadStreamedResponseAsync(HttpResponseMessage response, OpenAiConfig config, string system, string model, string prompt, IReadOnlyList<ImageAttachment> promptImages, List<ConversationTurn> history)

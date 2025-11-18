@@ -28,7 +28,7 @@ namespace Textgen
             var unsupported = promptAttachmentList.Where(a => a is not ImageAttachment).ToList();
             if (unsupported.Count > 0)
             {
-                throw new NotSupportedException($"Gemini generateContent only supports image attachments; found unsupported types: {string.Join(", ", unsupported.Select(a => a.Type))}");
+                _logger?.Log($"WARNING: Non-image attachments were provided and will be ignored for Gemini: {string.Join(", ", unsupported.Select(a => a.Type))}");
             }
             foreach (var entry in conversationLog.History)
             {

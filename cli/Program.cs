@@ -1,5 +1,7 @@
-﻿using System.Net.Http.Headers;
+﻿#nullable enable
+using System.Net.Http.Headers;
 using McMaster.Extensions.CommandLineUtils;
+using System.Security.Cryptography;
 
 namespace Textgen
 {
@@ -33,8 +35,7 @@ namespace Textgen
             conversationLogDirectoryOption.Accepts().ExistingDirectory();
             var restoreCacheOption = app.Option("-rc|--restore-cache <FNAME>", "Restore llama-server cache before sending chat messages.", CommandOptionType.SingleValue);
             var saveCacheOption = app.Option("-sc|--save-cache <FNAME>", "Save llama-server cache after sending chat messages.", CommandOptionType.SingleValue);
-            var imageOption = app.Option("-i|--image <FILE>", "Attach an image file (repeatable).", CommandOptionType.MultipleValue);
-            var visionOnlyOption = app.Option("--vision-only", "Send images without a text prompt.", CommandOptionType.NoValue);
+            var attachmentOption = app.Option("-a|--attachment <FILE>", "Attach a file (repeatable).", CommandOptionType.MultipleValue);
             var queryOption = app.Option("-q|--query", "Query and list available model names.", CommandOptionType.NoValue);
             var debugOption = app.Option("-d|--debug:<FILE_PATH>", "Real-time API logging.  No value -> stderr.  File path -> append log file.", CommandOptionType.SingleOrNoValue);
 
@@ -44,7 +45,7 @@ namespace Textgen
             app.OnExecuteAsync(async (cancellationToken) =>
             {
                 // Create ILogger (if any)
-                ILogger logger = null;
+                ILogger? logger = null;
                 if (debugOption.HasValue())
                 {
                     var debugFile = debugOption.Value();
@@ -130,19 +131,21 @@ namespace Textgen
                 }
 
                 // Existing options processing
-                string model = modelOption.Value();
-                string prompt = promptOption.Value();
-                string promptFile = promptFileOption.Value();
-                string system = systemOption.Value();
-                string systemFile = systemFileOption.Value();
-                string format = formatOption.Value();
-                string outputFile = outputOption.Value();
-                string outputDirectory = outputDirectoryOption.Value();
-                string configFile = configOption.Value();
-                string conversationLogFile = conversationLogOption.Value();
-                string conversationLogDirectory = conversationLogDirectoryOption.Value();
-                var imagePaths = imageOption.Values ?? new List<string>();
-                bool visionOnly = visionOnlyOption.HasValue();
+                string model = modelOption.Value() ?? string.Empty;
+                string prompt = promptOption.Value() ?? string.Empty;
+                string promptFile = promptFileOption.Value() ?? string.Empty;
+                string system = systemOption.Value() ?? string.Empty;
+                string systemFile = systemFileOption.Value() ?? string.Empty;
+                string format = formatOption.Value() ?? string.Empty;
+                string outputFile = outputOption.Value() ?? string.Empty;
+                string outputDirectory = outputDirectoryOption.Value() ?? string.Empty;
+                string configFile = configOption.Value() ?? string.Empty;
+                string conversationLogFile = conversationLogOption.Value() ?? string.Empty;
+                string conversationLogDirectory = conversationLogDirectoryOption.Value() ?? string.Empty;
+                var attachmentPaths = (attachmentOption.Values ?? new List<string?>())
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .Select(p => p!)
+                    .ToList();
 
                 // Check for conflicting options
                 if (!string.IsNullOrEmpty(conversationLogDirectory) && (!string.IsNullOrEmpty(outputFile) || !string.IsNullOrEmpty(outputDirectory)))
@@ -218,8 +221,7 @@ namespace Textgen
                     outputDirectory,
                     conversationLogFile,
                     conversationLogDirectory,
-                    imagePaths,
-                    visionOnly,
+                    attachmentPaths,
                     cancellationToken);
 
                 if (exitCode == 0)
@@ -242,21 +244,20 @@ namespace Textgen
         }
 
         private static async Task<int> RunBatchAsync(
-                TextGenerator textGenerator,
-                IConfig defaultConfig,
-                IConfig config,
-                string model,
-                string prompt,
-                string promptFile,
-                string system,
-                string systemFile,
+            TextGenerator textGenerator,
+            IConfig defaultConfig,
+            IConfig config,
+            string model,
+            string prompt,
+            string promptFile,
+            string system,
+            string systemFile,
             string format,
             string outputFile,
             string outputDirectory,
             string convLogFile,
             string convLogDir,
-            IReadOnlyList<string> imagePaths,
-            bool visionOnly,
+            IReadOnlyList<string> attachmentPaths,
             CancellationToken cancellationToken)
         {
             // Load prompt from file if specified
@@ -269,13 +270,14 @@ namespace Textgen
             // Load conversation history
             var conversationLog = await LogManager.LoadConversationAsync(convLogFile, convLogDir, defaultConfig, cancellationToken);
 
-            if (!TryBuildAttachments(imagePaths, out var promptAttachments))
+            if (!TryBuildAttachments(attachmentPaths, out var promptAttachments))
             {
                 return 1;
             }
 
             bool hasPrompt = !string.IsNullOrWhiteSpace(prompt);
-            bool hasImages = promptAttachments.Count > 0;
+            bool hasAttachments = promptAttachments.Count > 0;
+            bool hasSystem = !string.IsNullOrWhiteSpace(system);
 
             // Validate inputs
             if (string.IsNullOrEmpty(model))
@@ -284,19 +286,10 @@ namespace Textgen
                 return 1;
             }
 
-            if (!hasPrompt)
+            if (!hasPrompt && !hasSystem && !hasAttachments)
             {
-                if (!visionOnly)
-                {
-                    Console.WriteLine("Error: Prompt must be specified unless --vision-only is set.");
-                    return 1;
-                }
-
-                if (!hasImages)
-                {
-                    Console.WriteLine("Error: --vision-only requires at least one image.");
-                    return 1;
-                }
+                Console.WriteLine("Error: At least one of --prompt, --system, or --attachment must be provided.");
+                return 1;
             }
 
             PromptSequence promptSequence = PromptSequenceBuilder.FromString(prompt, promptAttachments);
@@ -406,8 +399,7 @@ namespace Textgen
                 var completed = await Task.WhenAny(inputTask, interruptTcs.Task);
                 if (completed != inputTask) break;
 
-                string input = inputTask.Result;
-                if (input == null) break;
+                var input = inputTask.Result ?? string.Empty;
                 input = input.Trim();
                 if (input.Equals("exit", StringComparison.OrdinalIgnoreCase)
                  || input.Equals("quit", StringComparison.OrdinalIgnoreCase))
@@ -476,7 +468,7 @@ namespace Textgen
             return DefaultApiHost;
         }
 
-        private static string ResolveApiKey(string apiHost, ILogger logger)
+        private static string? ResolveApiKey(string apiHost, ILogger? logger)
         {
             if (string.IsNullOrWhiteSpace(apiHost))
                 return null;
@@ -520,7 +512,7 @@ namespace Textgen
             }
         }
 
-        private static void LogWarning(ILogger logger, string message)
+        private static void LogWarning(ILogger? logger, string message)
         {
             logger?.Log($"Warning: {message}");
             if (logger == null)
@@ -529,10 +521,10 @@ namespace Textgen
             }
         }
 
-        private static bool TryBuildAttachments(IReadOnlyList<string> imagePaths, out List<Attachment> attachments)
+        private static bool TryBuildAttachments(IReadOnlyList<string> attachmentPaths, out List<Attachment> attachments)
         {
             attachments = new List<Attachment>();
-            if (imagePaths == null || imagePaths.Count == 0)
+            if (attachmentPaths == null || attachmentPaths.Count == 0)
             {
                 return true;
             }
@@ -540,7 +532,7 @@ namespace Textgen
             var errors = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var rawPath in imagePaths)
+            foreach (var rawPath in attachmentPaths)
             {
                 if (string.IsNullOrWhiteSpace(rawPath))
                     continue;
@@ -553,23 +545,34 @@ namespace Textgen
 
                 if (!File.Exists(fullPath))
                 {
-                    errors.Add($"Image file not found: {fullPath}");
-                    continue;
-                }
-
-                if (!ImageAttachment.IsSupportedExtension(fullPath))
-                {
-                    errors.Add($"Unsupported image file extension: {fullPath}");
+                    errors.Add($"Attachment file not found: {fullPath}");
                     continue;
                 }
 
                 try
                 {
-                    attachments.Add(ImageAttachment.FromFile(fullPath));
+                    var extension = Path.GetExtension(fullPath);
+                    if (ImageAttachment.IsSupportedExtension(fullPath))
+                    {
+                        attachments.Add(ImageAttachment.FromFile(fullPath));
+                    }
+                    else
+                    {
+                        var fileInfo = new FileInfo(fullPath);
+                        var attachment = new FileAttachment(GuessAttachmentType(extension))
+                        {
+                            FileName = fileInfo.Name,
+                            SourcePath = fullPath,
+                            StoredPath = fileInfo.Name,
+                            SizeBytes = fileInfo.Length,
+                            Sha256 = ComputeSha256(fullPath)
+                        };
+                        attachments.Add(attachment);
+                    }
                 }
                 catch (Exception ex)
                 {
-                    errors.Add($"Failed to read image '{fullPath}': {ex.Message}");
+                    errors.Add($"Failed to read attachment '{fullPath}': {ex.Message}");
                 }
             }
 
@@ -583,6 +586,31 @@ namespace Textgen
             }
 
             return true;
+        }
+
+        private static string GuessAttachmentType(string? extension)
+        {
+            if (string.IsNullOrWhiteSpace(extension))
+            {
+                return "binary";
+            }
+
+            extension = extension.ToLowerInvariant();
+            return extension switch
+            {
+                ".wav" or ".mp3" or ".aac" or ".flac" or ".ogg" => "audio",
+                ".mp4" or ".mov" or ".mkv" or ".webm" => "video",
+                ".pdf" => "document",
+                _ => "binary"
+            };
+        }
+
+        private static string ComputeSha256(string path)
+        {
+            using var sha = SHA256.Create();
+            using var stream = File.OpenRead(path);
+            var hash = sha.ComputeHash(stream);
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }
 }

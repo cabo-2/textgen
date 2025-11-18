@@ -116,7 +116,7 @@ while IFS= read -r -d '' file; do
   image_full=$(readlink -f "$file")
 
   echo "Processing $filename -> $output_file"
-  if ! textgen -I "$image_full" -o "$output_file" \
+  if ! textgen -a "$image_full" -o "$output_file" \
       -m "$model" \
       ${prompt:+-p "$prompt"} \
       ${prompt_file:+-P "$prompt_file"} \
