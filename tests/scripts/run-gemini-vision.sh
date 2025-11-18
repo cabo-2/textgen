@@ -37,6 +37,6 @@ mkdir -p "$OUT_DIR"
 TEXTGEN_API_HOST="$API_HOST" dotnet run --project cli -- \
   -m gemini-2.5-flash-lite \
   -P "$PROMPT" \
-  --image "$IMAGE" \
+  --attachment "$IMAGE" \
   -O "$OUT_DIR" \
   "$@"
